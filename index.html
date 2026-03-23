@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>旅行规划网页</title>
+  <meta name="description" content="用于多日旅行规划、地点整理、路线预览和 PDF 导出的静态网页应用">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar card">
+      <div class="title-block">
+        <p class="eyebrow">Travel Planner</p>
+        <h1>旅行规划网页</h1>
+      </div>
+      <section class="trip-inline">
+        <label><span>旅行名称</span><input id="tripName" type="text" placeholder="例如：苏州杭州 3 日游"></label>
+        <label><span>人数</span><input id="travelerCount" type="number" min="1" value="2"></label>
+        <label><span>开始日期</span><input id="startDate" type="date"></label>
+        <label><span>结束日期</span><input id="endDate" type="date"></label>
+      </section>
+      <div class="top-actions">
+        <button id="generateDaysBtn" type="button">生成天数</button>
+        <button id="saveBtn" type="button" class="ghost">保存</button>
+        <button id="exportBtn" type="button" class="ghost">导出 PDF</button>
+        <button id="resetBtn" type="button" class="ghost">清空</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="card pane left-pane">
+        <div class="section-head">
+          <h2>候选地点库</h2>
+          <span id="saveStatus" class="status">未保存</span>
+        </div>
+        <div class="search-box" autocomplete="off">
+          <label class="search-input-wrap">
+            <span>搜索地点 / 地址</span>
+            <input id="searchKeyword" type="text" placeholder="例如：拙政园、上海虹桥站、外滩">
+            <div id="suggestions" class="suggestions"></div>
+          </label>
+        </div>
+        <div class="sub-head">
+          <h3>已加入地点库</h3>
+          <span id="placeCount" class="muted">0 个地点</span>
+        </div>
+        <div id="placePool" class="place-pool"></div>
+      </section>
+
+      <section class="card pane center-pane">
+        <div class="section-head center-head">
+          <h2>多日行程规划</h2>
+          <div id="dayTabs" class="day-tabs"></div>
+        </div>
+        <div id="daysContainer" class="days-container"></div>
+      </section>
+
+      <section class="card pane right-pane">
+        <div class="section-head right-head">
+          <h2>地图预览</h2>
+          <div class="map-toolbar">
+            <label class="map-day-field">
+              <select id="mapDaySelect"></select>
+            </label>
+            <button id="refreshMapBtn" type="button" class="ghost">刷新</button>
+          </div>
+        </div>
+        <div id="mapLegend" class="map-legend"></div>
+        <div id="mapCanvas" class="map-canvas">
+          <div id="mapStage" class="map-stage"></div>
+          <div id="mapEmptyState" class="map-empty"></div>
+        </div>
+        <div id="routeSummary" class="route-summary"></div>
+      </section>
+    </main>
+  </div>
+
+  <template id="placeCardTemplate">
+    <article class="place-card" draggable="true">
+      <div class="place-title-row">
+        <div class="place-main">
+          <h3 class="place-name"></h3>
+          <p class="mini place-meta"></p>
+        </div>
+        <button type="button" class="small ghost delete-place">删除</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="dayCardTemplate">
+    <section class="day-card">
+      <div class="day-header">
+        <div>
+          <h3 class="day-title"></h3>
+          <p class="muted day-date"></p>
+        </div>
+        <div class="day-stats"></div>
+      </div>
+      <div class="drop-zone"></div>
+    </section>
+  </template>
+
+  <template id="itineraryItemTemplate">
+    <article class="itinerary-item" draggable="true">
+      <div class="item-top">
+        <div class="item-main">
+          <strong class="item-order"></strong>
+          <h4 class="item-name"></h4>
+          <p class="mini item-address"></p>
+        </div>
+        <button type="button" class="small ghost remove-item">移除</button>
+      </div>
+      <div class="time-grid">
+        <div class="time-chip arrival-block">
+          <span class="time-label">到达</span>
+          <strong class="arrival-time">--:--</strong>
+        </div>
+        <label class="depart-field">
+          <span>出发</span>
+          <input class="start-time" type="time">
+        </label>
+        <div class="time-chip leave-block">
+          <span class="time-label">离开</span>
+          <strong class="leave-time">--:--</strong>
+        </div>
+      </div>
+      <div class="compact-grid compact-grid-item">
+        <label><span>类型</span><select class="place-type"></select></label>
+        <label class="stay-field"><span>停留</span><select class="stay-duration"></select></label>
+      </div>
+      <label class="compact-note-field">
+        <span>备注</span>
+        <input class="item-notes" type="text" placeholder="可选备注">
+      </label>
+    </article>
+  </template>
+
+  <template id="segmentTemplate">
+    <div class="segment-card">
+      <div class="segment-top">
+        <span class="segment-label"></span>
+        <span class="segment-metrics"></span>
+      </div>
+      <label>
+        <span>出行方式</span>
+        <select class="transport-mode"></select>
+      </label>
+    </div>
+  </template>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
+
+

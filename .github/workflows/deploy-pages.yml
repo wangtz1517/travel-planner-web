@@ -1,0 +1,50 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare static files
+        env:
+          AMAP_KEY: ${{ secrets.AMAP_KEY }}
+          AMAP_SECURITY_JS_CODE: ${{ secrets.AMAP_SECURITY_JS_CODE }}
+          AMAP_DEFAULT_CITY: ${{ vars.AMAP_DEFAULT_CITY }}
+        run: |
+          mkdir -p dist
+          cp -R assets docs scripts index.html LICENSE README.md package.json dist/
+          touch dist/.nojekyll
+          node -e "const fs=require('fs'); const path='dist/assets/js/config.js'; const config={amapKey:process.env.AMAP_KEY||'', amapSecurityJsCode:process.env.AMAP_SECURITY_JS_CODE||'', defaultCity:process.env.AMAP_DEFAULT_CITY||'上海'}; fs.writeFileSync(path, 'window.APP_CONFIG = ' + JSON.stringify(config, null, 2) + ';\\n');"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

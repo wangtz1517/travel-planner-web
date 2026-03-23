@@ -1,0 +1,16 @@
+Thumbs.db
+.DS_Store
+
+# Local IDE / editor
+.vscode/
+.idea/
+
+# Local runtime files
+*.log
+
+# Optional local config backup
+assets/js/config.local.js
+node_modules/
+package-lock.json
+server.log
+server.err.log

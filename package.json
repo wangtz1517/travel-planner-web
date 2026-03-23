@@ -1,0 +1,15 @@
+{
+  "name": "travel-planner-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static travel planner web app for local planning and maintenance.",
+  "scripts": {
+    "dev": "node scripts/server.js",
+    "start": "node scripts/server.js",
+    "dev:lan": "node scripts/server.js --host 0.0.0.0",
+    "dev:8081": "node scripts/server.js --port 8081"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

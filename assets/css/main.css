@@ -76,7 +76,8 @@ button.small { padding: 6px 10px; font-size: 12px; }
   border-radius: 14px;
   background: rgba(255, 252, 247, 0.99);
   box-shadow: 0 12px 28px rgba(89, 63, 39, 0.16);
-  overflow: hidden;
+  max-height: 420px;
+  overflow: auto;
 }
 .suggestions.has-items { display: block; }
 .suggestion-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid rgba(212, 199, 176, 0.96); background: transparent; }

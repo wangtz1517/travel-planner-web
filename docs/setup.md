@@ -1,6 +1,24 @@
-# 本地开发与维护说明
+# 本地维护与使用说明
 
-## 1. 推荐启动方式
+这份说明主要用于以后继续维护这个网页时快速查看，避免忘记本地启动和预览方式。
+
+## 1. 本地维护的正确流程
+
+以后如果要在本地修改这个网站，请按下面顺序操作：
+
+1. 在项目目录打开终端
+2. 启动本地静态服务器
+3. 用浏览器访问本地地址
+4. 修改代码并刷新页面查看效果
+5. 确认没问题后，再决定是否提交和发布
+
+项目目录：
+
+```text
+C:\Users\23326\Desktop\BaiduSyncdisk\Codex\旅行规划网页
+```
+
+## 2. 启动本地服务器
 
 在项目根目录执行：
 
@@ -8,149 +26,114 @@
 npm.cmd run dev
 ```
 
-默认地址：
+如果启动成功，终端通常会显示类似内容：
 
 ```text
-http://127.0.0.1:8080
+Static server running at http://127.0.0.1:8080
+Project root: C:\Users\23326\Desktop\BaiduSyncdisk\Codex\旅行规划网页
 ```
 
-如果你希望局域网内其他设备访问：
+注意：
 
-```powershell
-npm.cmd run dev:lan
+- 这个终端窗口不要关闭
+- 关闭后，本地网页就无法访问了
+
+## 3. 本地预览地址
+
+本地维护时，推荐在浏览器打开：
+
+```text
+http://travel-planner.localhost:8080
 ```
 
-如果 `8080` 端口被占用：
+这是当前高德白名单允许的本地访问地址。
 
-```powershell
-npm.cmd run dev:8081
+线上正式地址是：
+
+```text
+https://wangtz1517.github.io/travel-planner-web/
 ```
 
-## 2. 备用启动方式
+## 4. 不要直接打开 index.html
 
-如果不想通过 npm，也可以直接运行：
+不要再直接双击 `index.html`，也不要使用这种地址：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\serve.ps1
+```text
+file:///C:/.../index.html
 ```
 
-或：
+原因：
 
-```bat
-.\scripts\serve.cmd
-```
+- 直接打开本地文件只能看部分静态界面
+- 高德地图、地点搜索、路线服务等功能可能失效
+- 白名单校验也不会按正常网页域名工作
 
-## 3. 如何停止本地服务器
+也就是说：
 
-本地服务器启动后会持续占用当前终端。
+- 直接打开 `index.html` 只能勉强看 UI
+- 真正测试功能，必须先启动本地服务器
 
-停止方式：
+## 5. 常用维护文件
 
-1. 回到启动服务器的终端窗口
-2. 按 `Ctrl + C`
-3. 看到停止提示后即可关闭窗口
-
-## 4. 日常维护方式
-
-### 修改页面结构
-
-编辑：
+### 页面结构
 
 - `index.html`
 
-### 修改样式
-
-编辑：
+### 样式
 
 - `assets/css/main.css`
 
-### 修改交互逻辑
-
-编辑：
+### 交互逻辑
 
 - `assets/js/app.js`
 
-### 修改地图配置
-
-编辑：
+### 本地高德配置
 
 - `assets/js/config.js`
 
-建议保留一份示例模板：
+### 需求和说明文档
 
-- `assets/js/config.example.js`
+- `docs/requirements.md`
+- `docs/setup.md`
 
-## 5. 常见维护操作
+## 6. 如果本地地图或搜索失效
 
-### 修改默认端口
+优先检查下面几项：
 
-临时修改：
-
-```powershell
-node .\scripts\server.js --port 8090
-```
-
-### 修改监听地址
-
-仅本机访问：
+1. 是否已经执行了：
 
 ```powershell
-node .\scripts\server.js --host 127.0.0.1
+npm.cmd run dev
 ```
 
-局域网访问：
+2. 浏览器访问的是否是：
+
+```text
+http://travel-planner.localhost:8080
+```
+
+3. 是否误用了直接打开 `index.html`
+
+4. `assets/js/config.js` 里的高德 Key 和 `securityJsCode` 是否存在
+
+## 7. 停止本地服务器
+
+回到启动服务器的终端窗口，按：
+
+```text
+Ctrl + C
+```
+
+即可停止本地服务。
+
+## 8. 修改完成后如果要发布
+
+如果本地修改确认没问题，需要发布到线上，一般流程是：
 
 ```powershell
-node .\scripts\server.js --host 0.0.0.0
+& 'C:\Program Files\Git\cmd\git.exe' add .
+& 'C:\Program Files\Git\cmd\git.exe' commit -m "你的更新说明"
+& 'C:\Program Files\Git\cmd\git.exe' push
 ```
 
-### 检查 Node 是否可用
-
-```powershell
-node -v
-npm -v
-```
-
-## 6. 常见问题
-
-### 端口占用
-
-现象：
-
-- 启动时报端口被占用
-
-处理：
-
-- 换端口启动，例如 `npm run dev:8081`
-
-### PowerShell 无法直接运行 npm
-
-现象：
-
-- 报错 `npm.ps1` 被系统执行策略阻止
-
-处理：
-
-- 改用 `npm.cmd run dev`
-- 或改用 `powershell -ExecutionPolicy Bypass -File .\scripts\serve.ps1`
-
-### 修改后页面没变化
-
-处理：
-
-- 强制刷新浏览器
-- 确认编辑的是当前项目目录下的文件
-
-### 地图不显示
-
-处理：
-
-- 检查 `assets/js/config.js` 中的高德 Key 和安全密钥
-- 确认当前访问域名或本地环境符合高德配置要求
-
-## 7. 建议的维护习惯
-
-- 每次较大改动前先备份或提交一次版本
-- 尽量把样式、交互、配置分别维护在不同文件
-- 新增资源统一放到 `assets/` 目录下
-- 新增说明文档统一放到 `docs/` 目录下
+推送后，GitHub Pages 会自动重新部署。

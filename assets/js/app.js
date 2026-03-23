@@ -16,6 +16,7 @@ const TRANSPORT_MODES = [
 ];
 const STAY_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
 const ROUTE_SERVICE_MODES = new Set(["walk", "taxi", "drive", "transit", "bike"]);
+const SUGGESTION_LIMIT = 10;
 
 const els = {
   tripName: document.getElementById("tripName"),
@@ -452,7 +453,7 @@ function renderSuggestions() {
   els.suggestions.innerHTML = "";
   els.suggestions.classList.toggle("has-items", suggestions.length > 0);
   if (!suggestions.length) return;
-  suggestions.slice(0, 5).forEach((item, index) => {
+  suggestions.slice(0, SUGGESTION_LIMIT).forEach((item, index) => {
     const row = document.createElement("div");
     row.className = `suggestion-row${index === activeSuggestionIndex ? " active" : ""}`;
     row.innerHTML = `
@@ -761,7 +762,7 @@ async function ensureMapReady() {
     window.addEventListener("resize", () => mapInstance?.resize());
   }
   if (!autocompleteService) autocompleteService = new AMapRef.AutoComplete({ city: getConfig().defaultCity || "全国", citylimit: false });
-  if (!placeSearchService) placeSearchService = new AMapRef.PlaceSearch({ city: getConfig().defaultCity || "全国", citylimit: false, pageSize: 5, pageIndex: 1 });
+  if (!placeSearchService) placeSearchService = new AMapRef.PlaceSearch({ city: getConfig().defaultCity || "全国", citylimit: false, pageSize: SUGGESTION_LIMIT, pageIndex: 1 });
   return AMapRef;
 }
 function getRouteService(AMapRef, modeValue) {
@@ -925,7 +926,7 @@ async function searchPlaces(keyword) {
     autocompleteService.search(trimmed, (status, result) => {
       if (status === "complete") {
         const tips = (result.tips || []).filter((item) => item.name);
-        suggestions = tips.slice(0, 5).map((item) => ({
+        suggestions = tips.slice(0, SUGGESTION_LIMIT).map((item) => ({
           id: item.id || item.uid || "",
           name: item.name,
           address: item.address || "",
@@ -956,7 +957,7 @@ function fallbackPlaceSearch(keyword) {
       return;
     }
     const pois = result.poiList?.pois || [];
-    suggestions = pois.slice(0, 5).map((poi) => ({
+    suggestions = pois.slice(0, SUGGESTION_LIMIT).map((poi) => ({
       id: poi.id || "",
       name: poi.name,
       address: poi.address || "",

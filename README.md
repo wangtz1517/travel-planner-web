@@ -1,77 +1,71 @@
-# Travel Planner Web
+# 旅行规划网页
 
-一个基于原生 HTML、CSS、JavaScript 的静态旅行规划网页，用于整理多日行程、候选地点、地图路线预览和 PDF 导出。
+一个用于整理多日旅行计划的网页工具，适合在出发前统一安排每天去哪里、几点出发、每站停留多久，以及各地点之间的出行方式。
 
-## 本地运行
-
-推荐使用 Node 启动本地静态服务器。
-
-PowerShell:
-
-```powershell
-npm.cmd run dev
-```
-
-CMD:
-
-```bat
-npm run dev
-```
-
-默认访问地址：
+在线使用地址：
 
 ```text
-http://127.0.0.1:8080
+https://wangtz1517.github.io/travel-planner-web/
 ```
 
-其他常用命令：
+## 适合做什么
 
-```powershell
-npm.cmd run start
-npm.cmd run dev:lan
-npm.cmd run dev:8081
-```
+- 规划多日旅行行程
+- 搜索并整理候选地点
+- 按天安排地点顺序
+- 自动计算停留时间、出行时间和总里程
+- 在地图上预览当天路线
+- 导出 PDF 方便保存或分享
 
-## 目录结构
+## 主要功能
 
-```text
-.
-├─ index.html
-├─ package.json
-├─ README.md
-├─ assets/
-│  ├─ css/main.css
-│  ├─ icons/favicon.svg
-│  └─ js/
-│     ├─ app.js
-│     ├─ config.js
-│     └─ config.example.js
-├─ docs/
-│  ├─ deploy-github-pages.md
-│  ├─ requirements.md
-│  └─ setup.md
-└─ scripts/
-   ├─ server.js
-   ├─ serve.cmd
-   └─ serve.ps1
-```
+- 旅行基础信息填写：名称、人数、开始日期、结束日期
+- 候选地点搜索：支持地点联想和快速加入地点库
+- 多日行程规划：按 Day 切换，拖拽调整顺序
+- 时间推导：根据起点出发时间自动推算后续到达和离开时间
+- 路线展示：支持地图标点、路线连接、分段交通摘要
+- 本地保存：自动保存在当前浏览器中
+- PDF 导出：可将当前规划导出为打印友好的页面
 
-## 配置说明
+## 使用步骤
 
-- `assets/js/config.js`：默认公开配置文件，仓库中只保留占位值
-- `assets/js/config.example.js`：配置示例
-- 发布到 GitHub Pages 时，工作流会根据仓库 Secrets 生成线上使用的 `config.js`
+1. 打开网页，填写旅行名称、人数和日期范围。
+2. 点击“生成天数”，创建本次旅行的 Day 1、Day 2 等行程区域。
+3. 在左侧搜索地点，将候选地点加入地点库。
+4. 把地点拖到中间的每日行程中，并调整先后顺序。
+5. 为每个地点设置停留时间，必要时补充备注。
+6. 为相邻地点选择出行方式，如步行、打车、自驾、公交、骑行等。
+7. 在右侧地图查看路线和当天摘要。
+8. 确认无误后，点击“导出 PDF”保存或分享。
 
-当前项目的地图能力依赖高德 Web 端 JS API。站点一旦公开，前端配置天然可被访问者看到，所以请务必在高德后台配置域名白名单，不要使用无限制 Key。
+## 使用提示
 
-## GitHub Pages 发布
+- 建议先确定日期范围，再开始添加地点，这样系统会先生成每日容器。
+- 每天的第一个地点会作为起点，最后一个地点会作为终点。
+- 搜索结果依赖地图服务，名称较泛时建议输入更完整的地点名。
+- 如果想修改某一天的路线，直接拖拽地点顺序即可。
 
-仓库已支持使用 GitHub Actions 自动发布到 GitHub Pages。
+## 数据说明
 
-你需要在 GitHub 仓库设置中添加这些 Secrets / Variables：
+- 你的数据保存在当前浏览器的本地存储中。
+- 更换浏览器、清除浏览器缓存或换设备后，原数据不会自动同步。
+- 目前不提供账号系统，也不支持多人实时共享同一份行程。
 
-- Secret: `AMAP_KEY`
-- Secret: `AMAP_SECURITY_JS_CODE`
-- Variable: `AMAP_DEFAULT_CITY`，例如 `上海`
+## 适用设备
 
-更完整的发布步骤见 [docs/deploy-github-pages.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/deploy-github-pages.md)。
+- 电脑端体验最佳
+- 现代浏览器可用，建议使用最新版 Chrome、Edge 或 Safari
+
+## 常见问题
+
+### 1. 为什么我朋友打开后看不到我的行程？
+
+因为数据保存在你自己的浏览器本地。朋友可以使用同一个网页工具，但不会自动看到你保存的内容。若要分享结果，建议导出 PDF。
+
+### 2. 地图没有显示怎么办？
+
+先刷新页面，再确认网络正常。如果仍然无法显示，可能是地图服务加载失败，可以稍后重试。
+
+### 3. 导出 PDF 后排版和屏幕不完全一样，正常吗？
+
+正常。导出 PDF 时会切换到更适合打印和分享的排版样式。

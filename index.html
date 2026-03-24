@@ -158,6 +158,57 @@
             </section>
           </div>
         </section>
+
+        <section id="footprintCard" class="card home-card footprint-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Footprint</p>
+              <h2>已走过的城市</h2>
+            </div>
+            <span id="footprintBadge" class="status-badge">等待点亮</span>
+          </div>
+          <p id="footprintIntro" class="panel-note">归档后的旅行计划会在这里沉淀成足迹地图。省份会整体变深，去过的城市会以圆点标记。</p>
+          <div class="footprint-stats">
+            <article class="footprint-stat-card">
+              <span>已归档计划</span>
+              <strong id="footprintPlanCount">0</strong>
+            </article>
+            <article class="footprint-stat-card">
+              <span>点亮省份</span>
+              <strong id="footprintProvinceCount">0</strong>
+            </article>
+            <article class="footprint-stat-card">
+              <span>记录城市</span>
+              <strong id="footprintCityCount">0</strong>
+            </article>
+          </div>
+          <div class="footprint-content">
+            <div class="footprint-map-shell">
+              <div id="footprintMapStage" class="footprint-map-stage"></div>
+              <div id="footprintMapEmpty" class="footprint-map-empty">登录并归档至少一条带城市信息的旅行计划后，这里会开始点亮你的中国足迹地图。</div>
+            </div>
+            <aside class="footprint-side-panel">
+              <section class="footprint-panel">
+                <div class="sub-head">
+                  <h3>省份详情</h3>
+                  <span id="footprintProvinceMeta" class="muted">点击地图上的省份</span>
+                </div>
+                <div class="footprint-panel-title-row">
+                  <strong id="footprintProvinceTitle">还没有选中省份</strong>
+                </div>
+                <div id="footprintProvinceList" class="footprint-city-list"></div>
+                <div id="footprintProvinceEmpty" class="empty-block">点一下地图里已经点亮的省份，就能查看你在这个省走过的城市。</div>
+              </section>
+              <section class="footprint-panel">
+                <div class="sub-head">
+                  <h3>旅行热力排名</h3>
+                  <span class="muted">按记录城市数排序</span>
+                </div>
+                <div id="footprintRankingList" class="footprint-ranking-list"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -384,9 +435,7 @@
         window.location.hostname.endsWith(".localhost") ||
         window.location.hostname === "127.0.0.1";
       if (!isLocal) return;
-      const script = document.createElement("script");
-      script.src = "assets/js/config.local.js";
-      document.head.appendChild(script);
+      document.write('<script src="assets/js/config.local.js"><\/script>');
     })();
 
     window.APP_CONFIG = {

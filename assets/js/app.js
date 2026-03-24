@@ -2,7 +2,6 @@ const STORAGE_KEY = "travel_planner_v9";
 const PAGE_STORAGE_KEY = "gopace_active_page";
 const AUTH_VIEW_STORAGE_KEY = "gopace_auth_view";
 const CURRENT_PLAN_STORAGE_KEY = "gopace_current_plan_id";
-const APP_CONFIG = window.APP_CONFIG || {};
 
 const PLACE_TYPES = ["起点", "终点", "景点", "途径点", "饭店", "酒店", "交通枢纽", "购物", "休闲", "备用"];
 const TRANSPORT_MODES = [
@@ -78,6 +77,19 @@ const els = {
   homeSpotlightMeta: document.getElementById("homeSpotlightMeta"),
   homeRecentPlans: document.getElementById("homeRecentPlans"),
   homeRecentPlansEmpty: document.getElementById("homeRecentPlansEmpty"),
+  footprintCard: document.getElementById("footprintCard"),
+  footprintBadge: document.getElementById("footprintBadge"),
+  footprintIntro: document.getElementById("footprintIntro"),
+  footprintPlanCount: document.getElementById("footprintPlanCount"),
+  footprintProvinceCount: document.getElementById("footprintProvinceCount"),
+  footprintCityCount: document.getElementById("footprintCityCount"),
+  footprintMapStage: document.getElementById("footprintMapStage"),
+  footprintMapEmpty: document.getElementById("footprintMapEmpty"),
+  footprintProvinceMeta: document.getElementById("footprintProvinceMeta"),
+  footprintProvinceTitle: document.getElementById("footprintProvinceTitle"),
+  footprintProvinceList: document.getElementById("footprintProvinceList"),
+  footprintProvinceEmpty: document.getElementById("footprintProvinceEmpty"),
+  footprintRankingList: document.getElementById("footprintRankingList"),
   logoutBtn: document.getElementById("logoutBtn"),
   refreshPlansBtn: document.getElementById("refreshPlansBtn"),
   createBlankPlanBtn: document.getElementById("createBlankPlanBtn"),
@@ -144,7 +156,57 @@ let mapLoadedKey = "";
 let mapOverlays = [];
 let autocompleteService = null;
 let placeSearchService = null;
+let districtSearchService = null;
 let routeServices = {};
+let footprintMapInstance = null;
+let footprintProvinceLayer = null;
+let footprintMarkers = [];
+let footprintRenderToken = 0;
+const districtLookupCache = new Map();
+let footprintInfoWindow = null;
+let activeFootprintProvinceCode = "";
+let hoveredFootprintProvinceCode = "";
+let footprintProvinceDataMap = new Map();
+let footprintProvinceCodes = new Set();
+let footprintLayerClickHandler = null;
+let footprintLayerHoverHandler = null;
+let footprintLayerMouseOutHandler = null;
+const PROVINCE_NAME_MAP = {
+  "110000": "北京市",
+  "120000": "天津市",
+  "130000": "河北省",
+  "140000": "山西省",
+  "150000": "内蒙古自治区",
+  "210000": "辽宁省",
+  "220000": "吉林省",
+  "230000": "黑龙江省",
+  "310000": "上海市",
+  "320000": "江苏省",
+  "330000": "浙江省",
+  "340000": "安徽省",
+  "350000": "福建省",
+  "360000": "江西省",
+  "370000": "山东省",
+  "410000": "河南省",
+  "420000": "湖北省",
+  "430000": "湖南省",
+  "440000": "广东省",
+  "450000": "广西壮族自治区",
+  "460000": "海南省",
+  "500000": "重庆市",
+  "510000": "四川省",
+  "520000": "贵州省",
+  "530000": "云南省",
+  "540000": "西藏自治区",
+  "610000": "陕西省",
+  "620000": "甘肃省",
+  "630000": "青海省",
+  "640000": "宁夏回族自治区",
+  "650000": "新疆维吾尔自治区",
+  "710000": "台湾省",
+  "810000": "香港特别行政区",
+  "820000": "澳门特别行政区"
+};
 let supabaseClient = null;
 let authSession = null;
 let authProfile = null;
@@ -257,9 +319,10 @@ function loadState() {
 }
 
 function getConfig() {
+  const appConfig = window.APP_CONFIG || {};
   return {
-    amapKey: APP_CONFIG.amapKey || "",
-    amapSecurityJsCode: APP_CONFIG.amapSecurityJsCode || "",
+    amapKey: appConfig.amapKey || "",
+    amapSecurityJsCode: appConfig.amapSecurityJsCode || "",
     defaultCity: APP_CONFIG.defaultCity || "全国",
     supabaseUrl: APP_CONFIG.supabaseUrl || "",
     supabaseAnonKey: APP_CONFIG.supabaseAnonKey || ""
@@ -750,6 +813,7 @@ async function savePlanToCloud() {
     return;
   }
   els.saveCloudBtn.disabled = true;
+  const previousPlanIds = new Set(myPlans.map((plan) => plan.id));
   setCloudStatus("正在保存到云端...");
   const payload = {
     owner_id: authSession.user.id,
@@ -769,16 +833,17 @@ async function savePlanToCloud() {
         .update(payload)
         .eq("id", currentPlanId)
         .select("id, status")
-        .single();
+        .maybeSingle();
     } else {
       result = await supabaseClient
         .from("trip_plans")
         .insert(payload)
-        .select("id, status")
-        .single();
+        .select("id, status");
     }
     if (result.error) throw result.error;
-    setCurrentPlanMeta(result.data.id, result.data.status || payload.status);
+    const savedPlan = Array.isArray(result.data) ? result.data[0] : result.data;
+    if (!savedPlan?.id) throw new Error("云端返回了空结果，请稍后重试");
+    setCurrentPlanMeta(savedPlan.id, savedPlan.status || payload.status);
     await loadMyPlans();
     renderPlanList();
     renderAuthPanels();
@@ -1468,7 +1533,7 @@ function ensureAmapLoaded() {
       resolve(window.AMap);
     };
     const script = document.createElement("script");
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(amapKey)}&plugin=AMap.AutoComplete,AMap.PlaceSearch,AMap.Walking,AMap.Driving,AMap.Transfer,AMap.Riding&callback=${callbackName}`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(amapKey)}&plugin=AMap.AutoComplete,AMap.PlaceSearch,AMap.Walking,AMap.Driving,AMap.Transfer,AMap.Riding,AMap.DistrictSearch&callback=${callbackName}`;
     script.async = true;
     script.onerror = () => reject(new Error("高德地图脚本加载失败"));
     document.head.appendChild(script);
@@ -2160,6 +2225,204 @@ function renderHomeRecentPlans() {
   });
 }
 
+function getArchivedPlans() {
+  return myPlans.filter((plan) => plan.status === "archived");
+}
+
+function extractFootprintPlaces() {
+  return getArchivedPlans()
+    .flatMap((plan) => Array.isArray(plan?.snapshot?.places) ? plan.snapshot.places : [])
+    .filter((place) => place && (place.city || place.address || place.name))
+    .filter((place) => typeof place.lng === "number" && typeof place.lat === "number");
+}
+
+function hideFootprintEmptyState() {
+  els.footprintMapEmpty.classList.add("is-hidden");
+}
+
+function showFootprintEmptyState(message, badge = "等待点亮") {
+  els.footprintBadge.textContent = badge;
+  els.footprintMapEmpty.textContent = message;
+  els.footprintMapEmpty.classList.remove("is-hidden");
+  clearFootprintMarkers();
+  if (footprintProvinceLayer) {
+    footprintProvinceLayer.setMap(null);
+    footprintProvinceLayer = null;
+  }
+}
+
+function resetFootprintStats() {
+  els.footprintPlanCount.textContent = "0";
+  els.footprintProvinceCount.textContent = "0";
+  els.footprintCityCount.textContent = "0";
+}
+
+async function ensureFootprintMapReady() {
+  const AMapRef = await ensureAmapLoaded();
+  if (!footprintMapInstance) {
+    footprintMapInstance = new AMapRef.Map(els.footprintMapStage, {
+      viewMode: "2D",
+      zoom: 4.2,
+      center: [104.5, 35.2],
+      mapStyle: "amap://styles/whitesmoke",
+      dragEnable: true,
+      zoomEnable: true,
+      doubleClickZoom: false,
+      keyboardEnable: false,
+      jogEnable: false
+    });
+    window.addEventListener("resize", () => footprintMapInstance?.resize());
+  }
+  if (!districtSearchService) {
+    districtSearchService = new AMapRef.DistrictSearch({
+      level: "city",
+      subdistrict: 0,
+      extensions: "base"
+    });
+  }
+  return AMapRef;
+}
+
+function normalizeProvinceAdcode(adcode) {
+  const raw = String(adcode || "");
+  if (!/^\d{6}$/.test(raw)) return "";
+  return `${raw.slice(0, 2)}0000`;
+}
+
+function searchDistrict(keyword) {
+  return new Promise((resolve) => {
+    if (!districtSearchService || !keyword) {
+      resolve(null);
+      return;
+    }
+    districtSearchService.search(keyword, (status, result) => {
+      if (status !== "complete") {
+        resolve(null);
+        return;
+      }
+      const first = result?.districtList?.[0] || null;
+      resolve(first);
+    });
+  });
+}
+
+async function resolvePlaceDistrict(place) {
+  const searchTerms = [place.city, place.address, place.name].map((item) => String(item || "").trim()).filter(Boolean);
+  for (const term of searchTerms) {
+    if (districtLookupCache.has(term)) return districtLookupCache.get(term);
+    const district = await searchDistrict(term);
+    if (district?.adcode) {
+      const normalized = {
+        cityName: district.name || term,
+        cityAdcode: String(district.adcode),
+        provinceAdcode: normalizeProvinceAdcode(district.adcode)
+      };
+      districtLookupCache.set(term, normalized);
+      return normalized;
+    }
+  }
+  return null;
+}
+
+function clearFootprintMarkers() {
+  if (!footprintMapInstance || !footprintMarkers.length) return;
+  footprintMarkers.forEach((marker) => footprintMapInstance.remove(marker));
+  footprintMarkers = [];
+}
+
+function createFootprintProvinceLayer(AMapRef, provinceCodes) {
+  return new AMapRef.DistrictLayer.Country({
+    zIndex: 8,
+    depth: 1,
+    SOC: "CHN",
+    styles: {
+      "nation-stroke": "rgba(59, 89, 68, 0.22)",
+      "coastline-stroke": "rgba(59, 89, 68, 0.12)",
+      "province-stroke": "rgba(59, 89, 68, 0.28)",
+      fill: (props) => {
+        const provinceCode = normalizeProvinceAdcode(props.adcode_pro || props.adcode);
+        return provinceCodes.has(provinceCode)
+          ? "rgba(59, 89, 68, 0.58)"
+          : "rgba(214, 173, 120, 0.14)";
+      }
+    }
+  });
+}
+
+async function renderFootprintMap() {
+  const currentToken = ++footprintRenderToken;
+  resetFootprintStats();
+  const archivedPlans = getArchivedPlans();
+  els.footprintPlanCount.textContent = String(archivedPlans.length);
+  if (!authSession?.user) {
+    showFootprintEmptyState("登录后可在这里查看你已经走过的城市和省份。", "访客模式");
+    return;
+  }
+  if (!archivedPlans.length) {
+    showFootprintEmptyState("先把旅行计划归档，归档后的城市才会沉淀到足迹地图里。", "等待点亮");
+    return;
+  }
+  if (!getConfig().amapKey) {
+    showFootprintEmptyState("当前还没有配置高德地图 Key，足迹地图暂时无法渲染。", "待配置");
+    return;
+  }
+  const places = extractFootprintPlaces();
+  if (!places.length) {
+    showFootprintEmptyState("已归档计划里还没有可识别的城市坐标，保存带地点信息的行程后这里会自动点亮。", "数据不足");
+    return;
+  }
+
+  try {
+    const AMapRef = await ensureFootprintMapReady();
+    if (currentToken !== footprintRenderToken) return;
+
+    const resolvedCityMap = new Map();
+    for (const place of places) {
+      const resolved = await resolvePlaceDistrict(place);
+      if (currentToken !== footprintRenderToken) return;
+      const cityKey = resolved?.cityAdcode || `${place.city || place.address || place.name}_${place.lng}_${place.lat}`;
+      if (!resolvedCityMap.has(cityKey)) {
+        resolvedCityMap.set(cityKey, {
+          place,
+          resolved
+        });
+      }
+    }
+
+    const provinceCodes = new Set(
+      [...resolvedCityMap.values()]
+        .map((entry) => entry.resolved?.provinceAdcode)
+        .filter(Boolean)
+    );
+
+    els.footprintProvinceCount.textContent = String(provinceCodes.size);
+    els.footprintCityCount.textContent = String(resolvedCityMap.size);
+    els.footprintBadge.textContent = provinceCodes.size ? "足迹已点亮" : "等待点亮";
+    hideFootprintEmptyState();
+
+    if (footprintProvinceLayer) {
+      footprintProvinceLayer.setMap(null);
+      footprintProvinceLayer = null;
+    }
+    footprintProvinceLayer = createFootprintProvinceLayer(AMapRef, provinceCodes);
+    footprintProvinceLayer.setMap(footprintMapInstance);
+
+    clearFootprintMarkers();
+    footprintMarkers = [...resolvedCityMap.values()].map(({ place, resolved }) => new AMapRef.Marker({
+      position: [place.lng, place.lat],
+      offset: new AMapRef.Pixel(-6, -6),
+      anchor: "center",
+      title: resolved?.cityName || place.city || place.name || "已走过的城市",
+      content: '<span class="visited-city-dot"></span>'
+    }));
+    footprintMarkers.forEach((marker) => footprintMapInstance.add(marker));
+    footprintMapInstance.setZoomAndCenter(4.2, [104.5, 35.2]);
+    footprintMapInstance.resize();
+  } catch (error) {
+    showFootprintEmptyState(`足迹地图加载失败：${error.message}`, "加载失败");
+  }
+}
+
 function renderHomeOverview() {
   const configured = hasSupabaseConfig();
   const signedIn = Boolean(authSession?.user);
@@ -2176,6 +2439,7 @@ function renderHomeOverview() {
       els.homeSpotlightMeta.innerHTML = "<span>等待开始</span>";
     }
     renderHomeRecentPlans();
+    renderFootprintMap().catch(() => {});
     return;
   }
   const currentPlan = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId) || null) : null;
@@ -2201,6 +2465,7 @@ function renderHomeOverview() {
     els.homeSpotlightMeta.innerHTML = "<span>等待开始</span>";
   }
   renderHomeRecentPlans();
+  renderFootprintMap().catch(() => {});
 }
 
 function renderPlanList() {
@@ -2216,6 +2481,7 @@ function renderPlanList() {
   els.planManagerSummary.textContent = `当前显示 ${plans.length} 条计划，共 ${myPlans.length} 条`;
   if (!hasPlans) {
     renderHomeRecentPlans();
+    renderFootprintMap().catch(() => {});
     return;
   }
   plans.forEach((plan) => {
@@ -2292,6 +2558,413 @@ function renderPlanList() {
     els.libraryPlanList.append(article);
   });
   renderHomeRecentPlans();
+  renderFootprintMap().catch(() => {});
+}
+
+function getProvinceNameByCode(adcode) {
+  return PROVINCE_NAME_MAP[String(adcode || "")] || "未知省份";
+}
+
+function clearFootprintInfoWindow() {
+  if (!footprintInfoWindow || !footprintMapInstance) return;
+  footprintInfoWindow.close();
+}
+
+function createFootprintInfoWindow(AMapRef) {
+  if (!footprintInfoWindow) {
+    footprintInfoWindow = new AMapRef.InfoWindow({
+      isCustom: false,
+      offset: new AMapRef.Pixel(0, -18),
+      closeWhenClickMap: true
+    });
+  }
+  return footprintInfoWindow;
+}
+
+function resetFootprintPanels() {
+  activeFootprintProvinceCode = "";
+  hoveredFootprintProvinceCode = "";
+  footprintProvinceDataMap = new Map();
+  footprintProvinceCodes = new Set();
+  if (els.footprintProvinceMeta) els.footprintProvinceMeta.textContent = "点击地图上已经点亮的省份";
+  if (els.footprintProvinceTitle) els.footprintProvinceTitle.textContent = "还没有选中省份";
+  if (els.footprintProvinceList) els.footprintProvinceList.innerHTML = "";
+  if (els.footprintProvinceEmpty) els.footprintProvinceEmpty.hidden = false;
+  if (els.footprintRankingList) {
+    els.footprintRankingList.innerHTML = '<div class="empty-block">归档计划后，这里会生成你的旅行热力排名。</div>';
+  }
+  els.footprintMapStage?.closest(".footprint-map-shell")?.classList.remove("is-hovering");
+  clearFootprintInfoWindow();
+}
+
+function showFootprintEmptyState(message, badge = "等待点亮") {
+  els.footprintBadge.textContent = badge;
+  els.footprintMapEmpty.textContent = message;
+  els.footprintMapEmpty.classList.remove("is-hidden");
+  clearFootprintMarkers();
+  clearFootprintInfoWindow();
+  resetFootprintPanels();
+  if (footprintProvinceLayer) {
+    if (footprintLayerClickHandler && typeof footprintProvinceLayer.off === "function") {
+      footprintProvinceLayer.off("click", footprintLayerClickHandler);
+    }
+    if (footprintLayerHoverHandler && typeof footprintProvinceLayer.off === "function") {
+      footprintProvinceLayer.off("mousemove", footprintLayerHoverHandler);
+    }
+    if (footprintLayerMouseOutHandler && typeof footprintProvinceLayer.off === "function") {
+      footprintProvinceLayer.off("mouseout", footprintLayerMouseOutHandler);
+    }
+    footprintProvinceLayer.setMap(null);
+    footprintProvinceLayer = null;
+  }
+}
+
+async function resolvePlaceDistrict(place) {
+  const searchTerms = [place.city, place.address, place.name]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+  for (const term of searchTerms) {
+    if (districtLookupCache.has(term)) return districtLookupCache.get(term);
+    const district = await searchDistrict(term);
+    if (district?.adcode) {
+      const provinceAdcode = normalizeProvinceAdcode(district.adcode);
+      const normalized = {
+        cityName: district.name || place.city || term,
+        cityAdcode: String(district.adcode),
+        provinceAdcode,
+        provinceName: String(district.province || "").trim() || getProvinceNameByCode(provinceAdcode)
+      };
+      districtLookupCache.set(term, normalized);
+      return normalized;
+    }
+  }
+  return null;
+}
+
+function extractFootprintPlaces() {
+  return getArchivedPlans()
+    .flatMap((plan) => {
+      const places = Array.isArray(plan?.snapshot?.places) ? plan.snapshot.places : [];
+      return places.map((place) => ({
+        ...place,
+        __planId: plan.id,
+        __planTitle: plan.title || "未命名行程",
+        __planUpdatedAt: plan.updated_at || plan.created_at || ""
+      }));
+    })
+    .filter((place) => place && (place.city || place.address || place.name))
+    .filter((place) => typeof place.lng === "number" && typeof place.lat === "number");
+}
+
+function createFootprintProvinceLayer(AMapRef, provinceCodes, activeProvinceCode = "", hoverProvinceCode = "") {
+  return new AMapRef.DistrictLayer.Country({
+    zIndex: 8,
+    depth: 1,
+    SOC: "CHN",
+    styles: {
+      "nation-stroke": "rgba(59, 89, 68, 0.22)",
+      "coastline-stroke": "rgba(59, 89, 68, 0.12)",
+      "province-stroke": "rgba(59, 89, 68, 0.28)",
+      fill: (props) => {
+        const provinceCode = normalizeProvinceAdcode(props.adcode_pro || props.adcode);
+        if (provinceCode === activeProvinceCode) return "rgba(43, 53, 63, 0.82)";
+        if (provinceCode === hoverProvinceCode) return "rgba(59, 89, 68, 0.72)";
+        return provinceCodes.has(provinceCode)
+          ? "rgba(59, 89, 68, 0.58)"
+          : "rgba(214, 173, 120, 0.14)";
+      }
+    }
+  });
+}
+
+function setFootprintHoverState(provinceCode, AMapRef = window.AMap) {
+  const nextProvinceCode = provinceCode && footprintProvinceCodes.has(provinceCode) ? provinceCode : "";
+  if (hoveredFootprintProvinceCode === nextProvinceCode) return;
+  hoveredFootprintProvinceCode = nextProvinceCode;
+  els.footprintMapStage?.closest(".footprint-map-shell")?.classList.toggle("is-hovering", Boolean(nextProvinceCode));
+  if (AMapRef) refreshFootprintProvinceLayer(AMapRef);
+}
+
+function renderFootprintProvincePanel() {
+  if (!els.footprintProvinceTitle || !els.footprintProvinceList || !els.footprintProvinceEmpty) return;
+  const provinceData = footprintProvinceDataMap.get(activeFootprintProvinceCode);
+  els.footprintProvinceList.innerHTML = "";
+  if (!provinceData) {
+    els.footprintProvinceMeta.textContent = footprintProvinceCodes.size
+      ? "点击地图上已经点亮的省份"
+      : "归档计划后这里会自动生成详情";
+    els.footprintProvinceTitle.textContent = "还没有选中省份";
+    els.footprintProvinceEmpty.hidden = false;
+    return;
+  }
+  els.footprintProvinceMeta.textContent = `${provinceData.cityCount} 座城市 · ${provinceData.visitCount} 条足迹`;
+  els.footprintProvinceTitle.textContent = provinceData.provinceName;
+  els.footprintProvinceEmpty.hidden = true;
+
+  provinceData.cities
+    .slice()
+    .sort((a, b) => b.visitCount - a.visitCount || a.cityName.localeCompare(b.cityName, "zh-CN"))
+    .forEach((city) => {
+      const item = document.createElement("article");
+      item.className = "footprint-city-item";
+      item.innerHTML = `
+        <div class="footprint-city-main">
+          <strong>${escapeHtml(city.cityName)}</strong>
+          <span>${escapeHtml(city.planCount > 1 ? `${city.planCount} 个计划` : "1 个计划")}</span>
+        </div>
+        <span class="footprint-city-badge">${escapeHtml(city.visitCount > 1 ? `${city.visitCount} 次` : "已点亮")}</span>
+      `;
+      els.footprintProvinceList.append(item);
+    });
+}
+
+function renderFootprintRanking() {
+  if (!els.footprintRankingList) return;
+  els.footprintRankingList.innerHTML = "";
+  const ranking = [...footprintProvinceDataMap.values()].sort(
+    (a, b) => b.cityCount - a.cityCount || b.visitCount - a.visitCount || a.provinceName.localeCompare(b.provinceName, "zh-CN")
+  );
+  if (!ranking.length) {
+    els.footprintRankingList.innerHTML = '<div class="empty-block">归档计划后，这里会生成你的旅行热力排名。</div>';
+    return;
+  }
+  ranking.forEach((province, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `footprint-ranking-item${province.provinceCode === activeFootprintProvinceCode ? " is-active" : ""}`;
+    button.innerHTML = `
+      <span class="footprint-ranking-rank">#${index + 1}</span>
+      <div class="footprint-ranking-main">
+        <strong>${escapeHtml(province.provinceName)}</strong>
+        <span>${escapeHtml(`${province.cityCount} 座城市 · ${province.visitCount} 条足迹`)}</span>
+      </div>
+      <span class="footprint-ranking-badge">${escapeHtml(`${province.cityCount}`)}</span>
+    `;
+    button.addEventListener("click", () => selectFootprintProvince(province.provinceCode));
+    els.footprintRankingList.append(button);
+  });
+}
+
+function refreshFootprintProvinceLayer(AMapRef) {
+  if (!footprintMapInstance) return;
+  if (footprintProvinceLayer) {
+    if (footprintLayerClickHandler && typeof footprintProvinceLayer.off === "function") {
+      footprintProvinceLayer.off("click", footprintLayerClickHandler);
+    }
+    if (footprintLayerHoverHandler && typeof footprintProvinceLayer.off === "function") {
+      footprintProvinceLayer.off("mousemove", footprintLayerHoverHandler);
+    }
+    if (footprintLayerMouseOutHandler && typeof footprintProvinceLayer.off === "function") {
+      footprintProvinceLayer.off("mouseout", footprintLayerMouseOutHandler);
+    }
+    footprintProvinceLayer.setMap(null);
+    footprintProvinceLayer = null;
+  }
+  if (!footprintProvinceCodes.size) return;
+  footprintProvinceLayer = createFootprintProvinceLayer(
+    AMapRef,
+    footprintProvinceCodes,
+    activeFootprintProvinceCode,
+    hoveredFootprintProvinceCode
+  );
+  footprintProvinceLayer.setMap(footprintMapInstance);
+  if (typeof footprintProvinceLayer.on === "function") {
+    footprintLayerClickHandler = (event) => {
+      const props = event?.props || event?.data || {};
+      const provinceCode = normalizeProvinceAdcode(props.adcode_pro || props.adcode);
+      if (!provinceCode || !footprintProvinceCodes.has(provinceCode)) return;
+      selectFootprintProvince(provinceCode);
+    };
+    footprintLayerHoverHandler = (event) => {
+      const props = event?.props || event?.data || {};
+      const provinceCode = normalizeProvinceAdcode(props.adcode_pro || props.adcode);
+      setFootprintHoverState(provinceCode, AMapRef);
+    };
+    footprintLayerMouseOutHandler = () => {
+      setFootprintHoverState("", AMapRef);
+    };
+    footprintProvinceLayer.on("click", footprintLayerClickHandler);
+    footprintProvinceLayer.on("mousemove", footprintLayerHoverHandler);
+    footprintProvinceLayer.on("mouseout", footprintLayerMouseOutHandler);
+  }
+}
+
+function selectFootprintProvince(provinceCode) {
+  if (!provinceCode || !footprintProvinceDataMap.has(provinceCode)) return;
+  activeFootprintProvinceCode = provinceCode;
+  hoveredFootprintProvinceCode = provinceCode;
+  els.footprintMapStage?.closest(".footprint-map-shell")?.classList.add("is-hovering");
+  renderFootprintProvincePanel();
+  renderFootprintRanking();
+  if (window.AMap) refreshFootprintProvinceLayer(window.AMap);
+  const provinceData = footprintProvinceDataMap.get(provinceCode);
+  if (provinceData?.positions?.length && footprintMapInstance) {
+    footprintMapInstance.setFitView(
+      provinceData.positions.map((position) => new window.AMap.LngLat(position[0], position[1])),
+      false,
+      [72, 72, 72, 72]
+    );
+  }
+}
+
+async function renderFootprintMap() {
+  const currentToken = ++footprintRenderToken;
+  resetFootprintStats();
+  resetFootprintPanels();
+  const archivedPlans = getArchivedPlans();
+  els.footprintPlanCount.textContent = String(archivedPlans.length);
+
+  if (!authSession?.user) {
+    showFootprintEmptyState("登录后，归档过的旅行计划会在这里沉淀成你的中国足迹地图。", "等待登录");
+    return;
+  }
+  if (!archivedPlans.length) {
+    showFootprintEmptyState("先把一条计划归档起来吧。归档后的城市会在地图上慢慢点亮。");
+    return;
+  }
+  if (!getConfig().amapKey) {
+    showFootprintEmptyState("足迹地图需要高德地图 Key 才能显示，补齐配置后这里会自动恢复。", "等待地图");
+    return;
+  }
+
+  const places = extractFootprintPlaces();
+  if (!places.length) {
+    showFootprintEmptyState("已归档计划里暂时还没有完整的城市坐标。重新打开计划保存一次后，再归档会更容易点亮。", "等待坐标");
+    return;
+  }
+
+  try {
+    const AMapRef = await ensureFootprintMapReady();
+    if (currentToken !== footprintRenderToken) return;
+
+    const cityMap = new Map();
+    for (const place of places) {
+      const resolved = await resolvePlaceDistrict(place);
+      if (currentToken !== footprintRenderToken) return;
+      const provinceCode = resolved?.provinceAdcode || "";
+      if (!provinceCode) continue;
+      const cityCode = resolved?.cityAdcode || `${provinceCode}_${place.city || place.name || place.lng}_${place.lat}`;
+      const cityName = resolved?.cityName || place.city || place.name || "未知城市";
+      if (!cityMap.has(cityCode)) {
+        cityMap.set(cityCode, {
+          cityCode,
+          cityName,
+          provinceCode,
+          provinceName: resolved?.provinceName || getProvinceNameByCode(provinceCode),
+          lng: place.lng,
+          lat: place.lat,
+          visitCount: 0,
+          planIds: new Set(),
+          planTitles: new Set()
+        });
+      }
+      const cityEntry = cityMap.get(cityCode);
+      cityEntry.visitCount += 1;
+      if (place.__planId) cityEntry.planIds.add(place.__planId);
+      if (place.__planTitle) cityEntry.planTitles.add(place.__planTitle);
+    }
+
+    footprintProvinceDataMap = new Map();
+    cityMap.forEach((cityEntry) => {
+      const provinceCode = cityEntry.provinceCode;
+      if (!footprintProvinceDataMap.has(provinceCode)) {
+        footprintProvinceDataMap.set(provinceCode, {
+          provinceCode,
+          provinceName: cityEntry.provinceName,
+          cityCount: 0,
+          visitCount: 0,
+          cities: [],
+          positions: []
+        });
+      }
+      const provinceEntry = footprintProvinceDataMap.get(provinceCode);
+      provinceEntry.cityCount += 1;
+      provinceEntry.visitCount += cityEntry.visitCount;
+      provinceEntry.positions.push([cityEntry.lng, cityEntry.lat]);
+      provinceEntry.cities.push({
+        cityName: cityEntry.cityName,
+        cityCode: cityEntry.cityCode,
+        visitCount: cityEntry.visitCount,
+        planCount: cityEntry.planIds.size || 1,
+        lng: cityEntry.lng,
+        lat: cityEntry.lat
+      });
+    });
+
+    footprintProvinceCodes = new Set(footprintProvinceDataMap.keys());
+    els.footprintProvinceCount.textContent = String(footprintProvinceCodes.size);
+    els.footprintCityCount.textContent = String(cityMap.size);
+    els.footprintBadge.textContent = footprintProvinceCodes.size ? "足迹已点亮" : "等待点亮";
+    hideFootprintEmptyState();
+
+    if (!footprintProvinceCodes.size) {
+      showFootprintEmptyState("这些归档计划已经保存好了，但还缺少可识别的城市信息。稍后完善地点后，它们会自动点亮。", "等待识别");
+      return;
+    }
+
+    if (!footprintProvinceDataMap.has(activeFootprintProvinceCode)) {
+      activeFootprintProvinceCode = [...footprintProvinceDataMap.values()]
+        .sort((a, b) => b.cityCount - a.cityCount || b.visitCount - a.visitCount)[0]?.provinceCode || "";
+    }
+
+    renderFootprintProvincePanel();
+    renderFootprintRanking();
+    refreshFootprintProvinceLayer(AMapRef);
+
+    clearFootprintMarkers();
+    clearFootprintInfoWindow();
+    const infoWindow = createFootprintInfoWindow(AMapRef);
+    footprintMarkers = [...cityMap.values()].map((cityEntry) => {
+      const marker = new AMapRef.Marker({
+        position: [cityEntry.lng, cityEntry.lat],
+        offset: new AMapRef.Pixel(-6, -6),
+        anchor: "center",
+        title: cityEntry.cityName,
+        content: '<span class="visited-city-dot"></span>'
+      });
+      const infoContent = `
+        <div class="footprint-info-window">
+          <strong>${escapeHtml(cityEntry.cityName)}</strong>
+          <span>${escapeHtml(cityEntry.provinceName)}</span>
+          <span>${escapeHtml(cityEntry.visitCount > 1 ? `${cityEntry.visitCount} 条足迹` : "已记录 1 条足迹")}</span>
+        </div>
+      `;
+      marker.on("mouseover", () => {
+        setFootprintHoverState(cityEntry.provinceCode, AMapRef);
+        infoWindow.setContent(infoContent);
+        infoWindow.open(footprintMapInstance, [cityEntry.lng, cityEntry.lat]);
+      });
+      marker.on("mouseout", () => {
+        setFootprintHoverState("", AMapRef);
+        if (infoWindow) infoWindow.close();
+      });
+      marker.on("click", () => {
+        activeFootprintProvinceCode = cityEntry.provinceCode;
+        setFootprintHoverState(cityEntry.provinceCode, AMapRef);
+        renderFootprintProvincePanel();
+        renderFootprintRanking();
+        refreshFootprintProvinceLayer(AMapRef);
+        infoWindow.setContent(infoContent);
+        infoWindow.open(footprintMapInstance, [cityEntry.lng, cityEntry.lat]);
+      });
+      return marker;
+    });
+    footprintMarkers.forEach((marker) => footprintMapInstance.add(marker));
+
+    const activeProvince = footprintProvinceDataMap.get(activeFootprintProvinceCode);
+    if (activeProvince?.positions?.length) {
+      footprintMapInstance.setFitView(
+        activeProvince.positions.map((position) => new AMapRef.LngLat(position[0], position[1])),
+        false,
+        [72, 72, 72, 72]
+      );
+    } else {
+      footprintMapInstance.setZoomAndCenter(4.2, [104.5, 35.2]);
+    }
+    footprintMapInstance.resize();
+  } catch (error) {
+    showFootprintEmptyState(`足迹地图加载失败：${error.message}`, "加载失败");
+  }
 }
 
 function bindEvents() {
@@ -2402,6 +3075,157 @@ function bindEvents() {
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".search-input-wrap")) clearSuggestions();
   });
+}
+
+function getConfig() {
+  const appConfig = window.APP_CONFIG || {};
+  return {
+    amapKey: appConfig.amapKey || "",
+    amapSecurityJsCode: appConfig.amapSecurityJsCode || "",
+    defaultCity: appConfig.defaultCity || "全国",
+    supabaseUrl: appConfig.supabaseUrl || "",
+    supabaseAnonKey: appConfig.supabaseAnonKey || ""
+  };
+}
+
+async function savePlanToCloud() {
+  syncTripInputsToState();
+  saveState(false);
+  if (!supabaseClient || !authSession?.user) {
+    setCloudStatus("请先登录后再保存到云端。", true);
+    setActivePage(PAGES.home);
+    return;
+  }
+
+  els.saveCloudBtn.disabled = true;
+  setCloudStatus("正在保存到云端...");
+  const previousPlanIds = new Set(myPlans.map((plan) => plan.id));
+  const draftPlanId = currentPlanId || (window.crypto?.randomUUID ? window.crypto.randomUUID() : uid("plan"));
+  const payload = {
+    ...(currentPlanId ? {} : { id: draftPlanId }),
+    owner_id: authSession.user.id,
+    title: state.trip.name?.trim() || "未命名旅行",
+    status: currentPlanStatus === "archived" ? "archived" : "active",
+    start_date: state.trip.startDate || null,
+    end_date: state.trip.endDate || null,
+    travelers: Math.max(1, Number(state.trip.travelers || 1)),
+    snapshot: state,
+    archived_at: currentPlanStatus === "archived" ? new Date().toISOString() : null
+  };
+
+  try {
+    let result;
+    if (currentPlanId) {
+      result = await supabaseClient
+        .from("trip_plans")
+        .update(payload)
+        .eq("id", currentPlanId)
+        .select("id, status")
+        .maybeSingle();
+    } else {
+      result = await supabaseClient
+        .from("trip_plans")
+        .insert(payload)
+        .select("id, status");
+    }
+
+    if (result.error) throw result.error;
+
+    let savedPlan = Array.isArray(result.data) ? result.data[0] : result.data;
+    await loadMyPlans();
+
+    if (!savedPlan?.id && currentPlanId) {
+      savedPlan = myPlans.find((plan) => plan.id === currentPlanId) || null;
+    }
+
+    if (!savedPlan?.id && !currentPlanId) {
+      savedPlan =
+        myPlans.find((plan) => !previousPlanIds.has(plan.id)) ||
+        myPlans.find((plan) =>
+          (plan.title || "") === payload.title &&
+          (plan.start_date || null) === payload.start_date &&
+          (plan.end_date || null) === payload.end_date
+        ) ||
+        myPlans[0] ||
+        null;
+    }
+
+    if (!savedPlan?.id) {
+      savedPlan = {
+        id: draftPlanId,
+        status: payload.status,
+        title: payload.title,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        travelers: payload.travelers,
+        snapshot: payload.snapshot,
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        archived_at: payload.archived_at
+      };
+      myPlans = [savedPlan, ...myPlans];
+    }
+
+    setCurrentPlanMeta(savedPlan.id, savedPlan.status || payload.status);
+    renderPlanList();
+    renderAuthPanels();
+    setCloudStatus(`云端已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);
+    setAccountFeedback("旅行计划已同步到云端。");
+  } catch (error) {
+    setCloudStatus(`云端保存失败：${error.message}`, true);
+  } finally {
+    els.saveCloudBtn.disabled = false;
+  }
+}
+
+async function savePlanToCloud() {
+  syncTripInputsToState();
+  saveState(false);
+  if (!supabaseClient || !authSession?.user) {
+    setCloudStatus("请先登录后再保存到云端。", true);
+    setActivePage(PAGES.home);
+    return;
+  }
+
+  els.saveCloudBtn.disabled = true;
+  setCloudStatus("正在保存到云端...");
+  const hasExistingCloudPlan = Boolean(currentPlanId && myPlans.some((plan) => plan.id === currentPlanId));
+  const draftPlanId = currentPlanId || (window.crypto?.randomUUID ? window.crypto.randomUUID() : uid("plan"));
+  const payload = {
+    plan_id: hasExistingCloudPlan ? currentPlanId : null,
+    title: state.trip.name?.trim() || "未命名旅行",
+    status: currentPlanStatus === "archived" ? "archived" : "active",
+    start_date: state.trip.startDate || null,
+    end_date: state.trip.endDate || null,
+    travelers: Math.max(1, Number(state.trip.travelers || 1)),
+    snapshot: state,
+    archived_at: currentPlanStatus === "archived" ? new Date().toISOString() : null,
+    new_plan_id: hasExistingCloudPlan ? null : draftPlanId
+  };
+
+  try {
+    const { data, error } = await supabaseClient.rpc("save_trip_plan", payload);
+    if (error) {
+      if (String(error.message || "").includes("save_trip_plan")) {
+        throw new Error("请先在 Supabase SQL Editor 执行 save_trip_plan 函数脚本");
+      }
+      throw error;
+    }
+    if (!data?.id) {
+      throw new Error("云端保存接口未返回计划记录");
+    }
+
+    await loadMyPlans();
+    setCurrentPlanMeta(data.id, data.status || payload.status);
+    renderPlanList();
+    renderAuthPanels();
+    setCloudStatus(`云端已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);
+    setAccountFeedback("旅行计划已同步到云端。");
+  } catch (error) {
+    setCloudStatus(`云端保存失败：${error.message}`, true);
+  } finally {
+    els.saveCloudBtn.disabled = false;
+  }
 }
 
 async function bootstrap() {

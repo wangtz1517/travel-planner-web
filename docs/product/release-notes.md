@@ -6,6 +6,58 @@
 - 每次正式发布前，先更新 `docs/product/changelog.md`
 - 当前仓库不会自动生成本文件，仍由人工触发、Codex 协助整理
 
+## V20
+
+- 发布时间：2026-03-24
+- 发布提交：`8c117d8`
+- 发布分支：`main`
+
+### 本次版本重点
+
+- 完成项目文档体系重组，形成稳定的 `docs` 分类结构和统一命名规范。
+- 新增项目级 [AGENTS.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/AGENTS.md)，固定协作规则、文档治理规则和半自动发布流程。
+- 重构需求文档为“基线需求 `需求V1` + 持续迭代需求”的长期维护结构。
+- 修复首页足迹地图的跨省识别问题，以及“最近计划”列表超出后无法滚动的问题。
+
+### 主要更新说明
+
+#### 1. 文档与协作规范升级
+
+- `docs` 目录重新整理为 `product / development / deployment / backend` 四类固定结构。
+- 新增 [docs/README.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/README.md) 作为文档唯一入口，统一命名规范、分类规则和维护边界。
+- 新增 [docs/deployment/release-workflow.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/deployment/release-workflow.md)，固定发布前检查项与版本文档更新流程。
+
+#### 2. 项目级工作流固化
+
+- 新增 [AGENTS.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/AGENTS.md)，让新窗口也能通过仓库文件恢复项目规则，而不是依赖聊天上下文。
+- 明确了文档分类冻结规则、`changelog` / `release-notes` 边界，以及“只要有实际改动就更新 `changelog`”的默认执行规则。
+
+#### 3. 需求文档可持续迭代
+
+- [requirements.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/product/requirements.md) 现在拆为两部分：
+  - `1-13` 作为基线需求 `需求V1`
+  - 第 `14` 章作为持续迭代需求区，用于后续追加 `需求V2 / V3 / V4 ...`
+- 当前这轮新增方向已经整理为 `14.1 需求V2`
+
+#### 4. 首页与足迹地图修复
+
+- 足迹地图在跨省行程中，地点有经纬度时会优先按坐标反查省份，避免标题或混合文本误判省份。
+- 修复首页“旅行概览”中的“最近计划”列表超过可视范围后无法滚动的问题，现在会在卡片内部独立滚动。
+
+### 当前可用能力
+
+- 正式域名访问：`https://www.gopace.cn/`
+- 账号注册、登录与云端计划保存
+- 首页概览、行程库、功能页三页结构
+- 归档计划足迹地图展示
+- 稳定的项目文档、需求、发布与协作治理体系
+
+### 下一步建议
+
+- 继续迭代 `需求V3` 及后续版本，并统一写入 `requirements.md` 第 14 章
+- 逐步把更多体验型改动收敛进正式发布节奏，保持 `release-notes` 与线上版本同步
+- 继续完善分享、协作和账户管理能力
+
 ## V14
 
 - 发布时间：2026-03-24

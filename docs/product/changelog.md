@@ -149,3 +149,4 @@
 ## V20
 
 - 修复首页“旅行概览”中“最近计划”列表超过可视范围后无法滚动的问题；现在该列表会在卡片内部独立滚动，不再把整个概览区域撑开。
+- 补充 `V20` 的正式发布说明到 [release-notes.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/product/release-notes.md)，统一线上版本与发布文档记录。

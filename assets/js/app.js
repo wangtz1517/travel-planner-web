@@ -1,4 +1,7 @@
-﻿const STORAGE_KEY = "travel_planner_v9";
+const STORAGE_KEY = "travel_planner_v9";
+const PAGE_STORAGE_KEY = "gopace_active_page";
+const AUTH_VIEW_STORAGE_KEY = "gopace_auth_view";
+const CURRENT_PLAN_STORAGE_KEY = "gopace_current_plan_id";
 const APP_CONFIG = window.APP_CONFIG || {};
 
 const PLACE_TYPES = ["起点", "终点", "景点", "途径点", "饭店", "酒店", "交通枢纽", "购物", "休闲", "备用"];
@@ -17,8 +20,88 @@ const TRANSPORT_MODES = [
 const STAY_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
 const ROUTE_SERVICE_MODES = new Set(["walk", "taxi", "drive", "transit", "bike"]);
 const SUGGESTION_LIMIT = 10;
+const PAGES = { home: "home", library: "library", planner: "planner" };
+const AUTH_VIEWS = { register: "register", login: "login" };
 
 const els = {
+  homeGrid: document.getElementById("homeGrid"),
+  accountCard: document.getElementById("accountCard"),
+  brandBlock: document.getElementById("brandBlock"),
+  brandPopover: document.getElementById("brandPopover"),
+  brandProfileName: document.getElementById("brandProfileName"),
+  brandProfileStatus: document.getElementById("brandProfileStatus"),
+  brandProfileEmail: document.getElementById("brandProfileEmail"),
+  brandProfilePlanCount: document.getElementById("brandProfilePlanCount"),
+  brandOpenPlannerBtn: document.getElementById("brandOpenPlannerBtn"),
+  brandLogoutBtn: document.getElementById("brandLogoutBtn"),
+  navHomeBtn: document.getElementById("navHomeBtn"),
+  navLibraryBtn: document.getElementById("navLibraryBtn"),
+  navPlannerBtn: document.getElementById("navPlannerBtn"),
+  authBadge: document.getElementById("authBadge"),
+  homeAuthBadge: document.getElementById("homeAuthBadge"),
+  homePage: document.getElementById("homePage"),
+  libraryPage: document.getElementById("libraryPage"),
+  plannerPage: document.getElementById("plannerPage"),
+  supabaseConfigNotice: document.getElementById("supabaseConfigNotice"),
+  authGuestPanel: document.getElementById("authGuestPanel"),
+  authUserPanel: document.getElementById("authUserPanel"),
+  showRegisterBtn: document.getElementById("showRegisterBtn"),
+  showLoginBtn: document.getElementById("showLoginBtn"),
+  registerForm: document.getElementById("registerForm"),
+  loginForm: document.getElementById("loginForm"),
+  registerDisplayName: document.getElementById("registerDisplayName"),
+  registerEmail: document.getElementById("registerEmail"),
+  registerPassword: document.getElementById("registerPassword"),
+  loginEmail: document.getElementById("loginEmail"),
+  loginPassword: document.getElementById("loginPassword"),
+  registerSubmitBtn: document.getElementById("registerSubmitBtn"),
+  loginSubmitBtn: document.getElementById("loginSubmitBtn"),
+  authFeedback: document.getElementById("authFeedback"),
+  accountFeedback: document.getElementById("accountFeedback"),
+  profileDisplayName: document.getElementById("profileDisplayName"),
+  profileEmail: document.getElementById("profileEmail"),
+  profilePlanCount: document.getElementById("profilePlanCount"),
+  profileState: document.getElementById("profileState"),
+  goPlannerBtn: document.getElementById("goPlannerBtn"),
+  homeOverviewBadge: document.getElementById("homeOverviewBadge"),
+  homeOverviewText: document.getElementById("homeOverviewText"),
+  homeOpenPlannerBtn: document.getElementById("homeOpenPlannerBtn"),
+  homeOpenLibraryBtn: document.getElementById("homeOpenLibraryBtn"),
+  homeMiniLibraryBtn: document.getElementById("homeMiniLibraryBtn"),
+  homeMetricPlans: document.getElementById("homeMetricPlans"),
+  homeMetricArchived: document.getElementById("homeMetricArchived"),
+  homeMetricCurrent: document.getElementById("homeMetricCurrent"),
+  homePlanSpotlight: document.getElementById("homePlanSpotlight"),
+  homeSpotlightStatus: document.getElementById("homeSpotlightStatus"),
+  homeSpotlightTitle: document.getElementById("homeSpotlightTitle"),
+  homeSpotlightText: document.getElementById("homeSpotlightText"),
+  homeSpotlightMeta: document.getElementById("homeSpotlightMeta"),
+  homeRecentPlans: document.getElementById("homeRecentPlans"),
+  homeRecentPlansEmpty: document.getElementById("homeRecentPlansEmpty"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  refreshPlansBtn: document.getElementById("refreshPlansBtn"),
+  createBlankPlanBtn: document.getElementById("createBlankPlanBtn"),
+  saveCurrentAsNewBtn: document.getElementById("saveCurrentAsNewBtn"),
+  planSearchInput: document.getElementById("planSearchInput"),
+  planSortSelect: document.getElementById("planSortSelect"),
+  planFilterAllBtn: document.getElementById("planFilterAllBtn"),
+  planFilterActiveBtn: document.getElementById("planFilterActiveBtn"),
+  planFilterArchivedBtn: document.getElementById("planFilterArchivedBtn"),
+  planFilterCurrentBtn: document.getElementById("planFilterCurrentBtn"),
+  planManagerSummary: document.getElementById("planManagerSummary"),
+  planStatAll: document.getElementById("planStatAll"),
+  planStatActive: document.getElementById("planStatActive"),
+  planStatArchived: document.getElementById("planStatArchived"),
+  planStatCurrent: document.getElementById("planStatCurrent"),
+  libraryPlanList: document.getElementById("libraryPlanList"),
+  libraryPlanEmpty: document.getElementById("libraryPlanEmpty"),
+  homePlanList: document.getElementById("libraryPlanList"),
+  homePlanEmpty: document.getElementById("libraryPlanEmpty"),
+  currentPlanLabel: document.getElementById("currentPlanLabel"),
+  saveCloudBtn: document.getElementById("saveCloudBtn"),
+  openLibraryBtn: document.getElementById("openLibraryBtn"),
+  openHomeBtn: document.getElementById("openLibraryBtn"),
+  cloudStatus: document.getElementById("cloudStatus"),
   tripName: document.getElementById("tripName"),
   travelerCount: document.getElementById("travelerCount"),
   startDate: document.getElementById("startDate"),
@@ -39,6 +122,7 @@ const els = {
   mapLegend: document.getElementById("mapLegend"),
   mapStage: document.getElementById("mapStage"),
   mapEmptyState: document.getElementById("mapEmptyState"),
+  localOpenNotice: document.getElementById("localOpenNotice"),
   routeSummary: document.getElementById("routeSummary"),
   placeCardTemplate: document.getElementById("placeCardTemplate"),
   dayCardTemplate: document.getElementById("dayCardTemplate"),
@@ -48,6 +132,9 @@ const els = {
 
 let state = loadState();
 let selectedDayId = state.days[0]?.id || "";
+let activePage = loadStoredValue(PAGE_STORAGE_KEY, PAGES.home);
+let authView = loadStoredValue(AUTH_VIEW_STORAGE_KEY, AUTH_VIEWS.register);
+let currentPlanId = loadStoredValue(CURRENT_PLAN_STORAGE_KEY, "");
 let suggestions = [];
 let activeSuggestionIndex = -1;
 let autocompleteTimer = null;
@@ -58,6 +145,35 @@ let mapOverlays = [];
 let autocompleteService = null;
 let placeSearchService = null;
 let routeServices = {};
+let supabaseClient = null;
+let authSession = null;
+let authProfile = null;
+let myPlans = [];
+let currentPlanStatus = "";
+let planSearchQuery = "";
+let planFilter = "all";
+let planSort = "updated_desc";
+
+function loadStoredValue(key, fallback = "") {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw == null ? fallback : raw;
+  } catch {
+    return fallback;
+  }
+}
+
+function persistStoredValue(key, value) {
+  try {
+    if (value === "" || value == null) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write failures and keep the app usable.
+  }
+}
 
 function getTodayIso() {
   const now = new Date();
@@ -74,6 +190,16 @@ function createDefaultState() {
     places: [],
     days: []
   };
+}
+
+function renderLocalOpenNotice() {
+  if (window.location.protocol !== "file:") {
+    els.localOpenNotice.hidden = true;
+    els.localOpenNotice.innerHTML = "";
+    return;
+  }
+  els.localOpenNotice.hidden = false;
+  els.localOpenNotice.innerHTML = '<strong>当前是直接打开 index.html。</strong> 地图、地点搜索和路线服务可能无法正常使用。请先在项目目录执行 <code>npm.cmd run dev</code>，再通过 <code>http://travel-planner.localhost:8080</code> 访问。';
 }
 
 function ensureTripDates(trip) {
@@ -134,7 +260,9 @@ function getConfig() {
   return {
     amapKey: APP_CONFIG.amapKey || "",
     amapSecurityJsCode: APP_CONFIG.amapSecurityJsCode || "",
-    defaultCity: APP_CONFIG.defaultCity || "全国"
+    defaultCity: APP_CONFIG.defaultCity || "全国",
+    supabaseUrl: APP_CONFIG.supabaseUrl || "",
+    supabaseAnonKey: APP_CONFIG.supabaseAnonKey || ""
   };
 }
 
@@ -169,6 +297,247 @@ function saveState(showStatus = true) {
   if (showStatus) {
     els.saveStatus.textContent = `已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
   }
+}
+
+function hasSupabaseConfig() {
+  const { supabaseUrl, supabaseAnonKey } = getConfig();
+  return Boolean(supabaseUrl && supabaseAnonKey);
+}
+
+function setAuthFeedback(message = "", isError = false) {
+  if (!els.authFeedback) return;
+  els.authFeedback.textContent = message;
+  els.authFeedback.style.color = isError ? "var(--danger)" : "var(--muted)";
+}
+
+function setAccountFeedback(message = "", isError = false) {
+  if (!els.accountFeedback) return;
+  els.accountFeedback.textContent = message;
+  els.accountFeedback.style.color = isError ? "var(--danger)" : "var(--muted)";
+}
+
+function setCloudStatus(message, isError = false) {
+  if (!els.cloudStatus) return;
+  els.cloudStatus.textContent = message;
+  els.cloudStatus.style.color = isError ? "var(--danger)" : "var(--muted)";
+}
+
+function setCurrentPlanMeta(planId = "", status = "") {
+  currentPlanId = planId || "";
+  currentPlanStatus = status || "";
+  persistStoredValue(CURRENT_PLAN_STORAGE_KEY, currentPlanId);
+  renderPlannerMeta();
+  renderPlanList();
+  renderAuthPanels();
+}
+
+function renderPlannerMeta() {
+  const title = state.trip?.name?.trim() || "未命名旅行";
+  const binding = currentPlanId ? `已关联云端计划 · ${title}` : "未绑定";
+  const statusText = currentPlanStatus ? ` · 状态：${formatPlanStatus(currentPlanStatus)}` : "";
+  els.currentPlanLabel.textContent = `当前云端计划：${binding}${statusText}`;
+  if (!hasSupabaseConfig()) {
+    setCloudStatus("请先在 config.local.js 中配置 Supabase", true);
+  } else if (!authSession) {
+    setCloudStatus("登录后可保存到云端");
+  } else if (currentPlanId) {
+    setCloudStatus(`云端已连接${currentPlanStatus ? ` · ${formatPlanStatus(currentPlanStatus)}` : ""}`);
+  } else {
+    setCloudStatus("已登录，可新建云端计划");
+  }
+}
+
+function formatPlanStatus(status) {
+  if (status === "archived") return "已归档";
+  if (status === "active") return "进行中";
+  return "草稿";
+}
+
+function formatPlanDateRange(startDate, endDate) {
+  if (!startDate && !endDate) return "未设置日期";
+  if (startDate && endDate && startDate !== endDate) return `${startDate} 至 ${endDate}`;
+  return startDate || endDate || "未设置日期";
+}
+
+function normalizePlanText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getFilteredPlans() {
+  let plans = [...myPlans];
+  const query = normalizePlanText(planSearchQuery);
+  if (planFilter === "active") plans = plans.filter((plan) => plan.status !== "archived");
+  if (planFilter === "archived") plans = plans.filter((plan) => plan.status === "archived");
+  if (planFilter === "current") plans = plans.filter((plan) => plan.id === currentPlanId);
+  if (query) {
+    plans = plans.filter((plan) => normalizePlanText(plan.title).includes(query));
+  }
+  plans.sort((a, b) => {
+    if (planSort === "updated_asc") return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+    if (planSort === "title_asc") return String(a.title || "").localeCompare(String(b.title || ""), "zh-CN");
+    if (planSort === "title_desc") return String(b.title || "").localeCompare(String(a.title || ""), "zh-CN");
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  });
+  return plans;
+}
+
+function renderPlanFilters() {
+  const states = [
+    [els.planFilterAllBtn, "all"],
+    [els.planFilterActiveBtn, "active"],
+    [els.planFilterArchivedBtn, "archived"],
+    [els.planFilterCurrentBtn, "current"]
+  ];
+  states.forEach(([button, value]) => button.classList.toggle("active", planFilter === value));
+  els.planSortSelect.value = planSort;
+  els.planSearchInput.value = planSearchQuery;
+}
+
+function renderPlanStats() {
+  const allCount = myPlans.length;
+  const activeCount = myPlans.filter((plan) => plan.status !== "archived").length;
+  const archivedCount = myPlans.filter((plan) => plan.status === "archived").length;
+  els.planStatAll.textContent = String(allCount);
+  els.planStatActive.textContent = String(activeCount);
+  els.planStatArchived.textContent = String(archivedCount);
+  els.planStatCurrent.textContent = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId)?.title || "已绑定") : "无";
+}
+
+function setActivePage(nextPage) {
+  activePage = nextPage === PAGES.planner ? PAGES.planner : PAGES.home;
+  persistStoredValue(PAGE_STORAGE_KEY, activePage);
+  const isHome = activePage === PAGES.home;
+  els.homePage.hidden = !isHome;
+  els.plannerPage.hidden = isHome;
+  els.navHomeBtn.classList.toggle("active", isHome);
+  els.navPlannerBtn.classList.toggle("active", !isHome);
+  if (!isHome) {
+    renderAll();
+    ensureMapReady().catch(() => renderMap());
+  }
+}
+
+function setAuthView(nextView) {
+  authView = nextView === AUTH_VIEWS.login ? AUTH_VIEWS.login : AUTH_VIEWS.register;
+  persistStoredValue(AUTH_VIEW_STORAGE_KEY, authView);
+  const isRegister = authView === AUTH_VIEWS.register;
+  els.registerForm.hidden = !isRegister;
+  els.loginForm.hidden = isRegister;
+  els.showRegisterBtn.classList.toggle("active", isRegister);
+  els.showLoginBtn.classList.toggle("active", !isRegister);
+}
+
+function renderAuthPanels() {
+  const configured = hasSupabaseConfig();
+  const signedIn = Boolean(authSession?.user);
+  els.homeGrid.classList.toggle("signed-in", signedIn);
+  els.accountCard.hidden = signedIn;
+  els.supabaseConfigNotice.hidden = configured;
+  els.supabaseConfigNotice.textContent = configured
+    ? ""
+    : "Supabase 尚未配置。请先在 assets/js/config.local.js 中补充 supabaseUrl 和 supabaseAnonKey。";
+  els.authGuestPanel.hidden = signedIn;
+  els.authUserPanel.hidden = !signedIn;
+  els.authBadge.textContent = signedIn ? "已登录" : "未登录";
+  els.homeAuthBadge.textContent = signedIn ? "账号已连接" : (configured ? "未登录" : "待配置");
+  els.brandLogoutBtn.hidden = !signedIn;
+  if (!signedIn) {
+    setAuthView(authView);
+    els.profileDisplayName.textContent = "-";
+    els.profileEmail.textContent = "-";
+    els.profilePlanCount.textContent = "0";
+    els.profileState.textContent = configured ? "待登录" : "待配置";
+    els.brandProfileName.textContent = "未登录";
+    els.brandProfileStatus.textContent = configured ? "待登录" : "待配置";
+    els.brandProfileStatus.classList.remove("archived");
+    els.brandProfileEmail.textContent = configured ? "登录后可查看当前账号信息" : "请先配置 Supabase 后再使用账号能力";
+    els.brandProfilePlanCount.textContent = "0";
+    els.brandOpenPlannerBtn.textContent = "进入功能页";
+    return;
+  }
+  const displayName = authProfile?.display_name || authSession.user.user_metadata?.display_name || authSession.user.email?.split("@")[0] || "旅行者";
+  els.profileDisplayName.textContent = displayName;
+  els.profileEmail.textContent = authSession.user.email || "-";
+  els.profilePlanCount.textContent = String(myPlans.length);
+  els.profileState.textContent = "已登录";
+  els.brandProfileName.textContent = displayName;
+  els.brandProfileStatus.textContent = "已登录";
+  els.brandProfileStatus.classList.remove("archived");
+  els.brandProfileEmail.textContent = authSession.user.email || "-";
+  els.brandProfilePlanCount.textContent = String(myPlans.length);
+  els.brandOpenPlannerBtn.textContent = "进入功能页";
+}
+
+function renderPlanList() {
+  els.homePlanList.innerHTML = "";
+  renderPlanStats();
+  renderPlanFilters();
+  const plans = getFilteredPlans();
+  const hasPlans = Array.isArray(plans) && plans.length > 0;
+  els.homePlanEmpty.hidden = hasPlans;
+  els.homePlanEmpty.textContent = myPlans.length
+    ? "当前筛选条件下没有匹配的旅行计划。你可以切换筛选、清空搜索，或者新建一份计划。"
+    : "当前还没有符合条件的旅行计划。你可以先去功能页规划，再保存到云端。";
+  els.planManagerSummary.textContent = `当前显示 ${plans.length} 条计划，共 ${myPlans.length} 条`;
+  if (!hasPlans) return;
+  plans.forEach((plan) => {
+    const article = document.createElement("article");
+    article.className = "plan-card";
+    const statusClass = plan.status === "archived" ? " archived" : "";
+    const isCurrent = currentPlanId === plan.id;
+    const noteText = isCurrent ? "这份计划当前正绑定在功能页中，你继续编辑后可以直接覆盖保存到云端。" : "你可以从这里打开计划、继续编辑，或进行归档管理。";
+    article.innerHTML = `
+      <div class="plan-card-top">
+        <div class="plan-main">
+          <h3>${escapeHtml(plan.title || "未命名旅行")}</h3>
+          <div class="plan-card-meta">
+            <span>${escapeHtml(formatPlanDateRange(plan.start_date, plan.end_date))}</span>
+            <span>${escapeHtml(`人数 ${plan.travelers || 1}`)}</span>
+            <span>${escapeHtml(`更新于 ${new Date(plan.updated_at).toLocaleString("zh-CN")}`)}</span>
+            ${plan.created_at ? `<span>${escapeHtml(`创建于 ${new Date(plan.created_at).toLocaleDateString("zh-CN")}`)}</span>` : ""}
+          </div>
+        </div>
+        <span class="plan-status${statusClass}">${escapeHtml(isCurrent ? "当前编辑中" : formatPlanStatus(plan.status))}</span>
+      </div>
+      <p class="plan-card-notes">${escapeHtml(noteText)}</p>
+      <div class="plan-actions"></div>
+    `;
+    const actions = article.querySelector(".plan-actions");
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "small";
+    openBtn.textContent = "继续编辑";
+    openBtn.addEventListener("click", () => loadPlanFromCloud(plan.id));
+    actions.append(openBtn);
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "small ghost";
+    copyBtn.textContent = "复制为新计划";
+    copyBtn.addEventListener("click", () => duplicatePlan(plan.id));
+    actions.append(copyBtn);
+    if (plan.status !== "archived") {
+      const archiveBtn = document.createElement("button");
+      archiveBtn.type = "button";
+      archiveBtn.className = "small ghost";
+      archiveBtn.textContent = "归档";
+      archiveBtn.addEventListener("click", () => archivePlan(plan.id));
+      actions.append(archiveBtn);
+    } else {
+      const restoreBtn = document.createElement("button");
+      restoreBtn.type = "button";
+      restoreBtn.className = "small ghost";
+      restoreBtn.textContent = "取消归档";
+      restoreBtn.addEventListener("click", () => restorePlan(plan.id));
+      actions.append(restoreBtn);
+    }
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "small ghost";
+    deleteBtn.textContent = "删除";
+    deleteBtn.addEventListener("click", () => deletePlan(plan.id));
+    actions.append(deleteBtn);
+    els.homePlanList.append(article);
+  });
 }
 
 function formatDate(dateStr) {
@@ -212,6 +581,358 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getSupabaseClient() {
+  if (supabaseClient || !hasSupabaseConfig() || !window.supabase?.createClient) return supabaseClient;
+  const { supabaseUrl, supabaseAnonKey } = getConfig();
+  supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+  return supabaseClient;
+}
+
+async function initializeSupabase() {
+  const client = getSupabaseClient();
+  renderAuthPanels();
+  renderPlannerMeta();
+  renderPlanList();
+  if (!client) return;
+  const { data, error } = await client.auth.getSession();
+  if (error) {
+    setAuthFeedback(`登录态读取失败：${error.message}`, true);
+  }
+  authSession = data?.session || null;
+  await refreshAccountData();
+  client.auth.onAuthStateChange((_event, session) => {
+    authSession = session || null;
+    refreshAccountData().catch((authError) => {
+      setAccountFeedback(`账号状态刷新失败：${authError.message}`, true);
+    });
+  });
+}
+
+async function refreshAccountData() {
+  authProfile = null;
+  if (!authSession?.user) {
+    myPlans = [];
+    renderAuthPanels();
+    renderPlanList();
+    renderPlannerMeta();
+    return;
+  }
+  await Promise.all([loadProfile(), loadMyPlans()]);
+  renderAuthPanels();
+  renderPlanList();
+  renderPlannerMeta();
+}
+
+async function loadProfile() {
+  if (!authSession?.user || !supabaseClient) return null;
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, email, display_name, avatar_url, created_at, updated_at")
+    .eq("id", authSession.user.id)
+    .maybeSingle();
+  if (error) {
+    setAccountFeedback(`读取个人资料失败：${error.message}`, true);
+    return null;
+  }
+  authProfile = data || null;
+  return authProfile;
+}
+
+async function loadMyPlans() {
+  if (!authSession?.user || !supabaseClient) {
+    myPlans = [];
+    return myPlans;
+  }
+  const { data, error } = await supabaseClient
+    .from("trip_plans")
+    .select("id, title, status, start_date, end_date, travelers, snapshot, updated_at, created_at, archived_at")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    setAccountFeedback(`读取旅行计划失败：${error.message}`, true);
+    myPlans = [];
+    return myPlans;
+  }
+  myPlans = data || [];
+  return myPlans;
+}
+
+async function handleRegister(event) {
+  event.preventDefault();
+  if (!hasSupabaseConfig()) {
+    setAuthFeedback("请先配置 Supabase URL 和 anon key。", true);
+    return;
+  }
+  const email = els.registerEmail.value.trim();
+  const password = els.registerPassword.value;
+  const displayName = els.registerDisplayName.value.trim();
+  if (!email || !password) {
+    setAuthFeedback("请先填写邮箱和密码。", true);
+    return;
+  }
+  els.registerSubmitBtn.disabled = true;
+  setAuthFeedback("正在注册账号...");
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: displayName }
+      }
+    });
+    if (error) throw error;
+    if (data.session) {
+      setAuthFeedback("注册成功，已自动登录。");
+      els.registerForm.reset();
+    } else {
+      setAuthFeedback("注册成功，请先到邮箱完成确认，然后再登录。");
+      setAuthView(AUTH_VIEWS.login);
+    }
+  } catch (error) {
+    setAuthFeedback(`注册失败：${error.message}`, true);
+  } finally {
+    els.registerSubmitBtn.disabled = false;
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  if (!hasSupabaseConfig()) {
+    setAuthFeedback("请先配置 Supabase URL 和 anon key。", true);
+    return;
+  }
+  const email = els.loginEmail.value.trim();
+  const password = els.loginPassword.value;
+  if (!email || !password) {
+    setAuthFeedback("请先填写邮箱和密码。", true);
+    return;
+  }
+  els.loginSubmitBtn.disabled = true;
+  setAuthFeedback("正在登录...");
+  try {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    setAuthFeedback("登录成功。");
+    els.loginForm.reset();
+  } catch (error) {
+    setAuthFeedback(`登录失败：${error.message}`, true);
+  } finally {
+    els.loginSubmitBtn.disabled = false;
+  }
+}
+
+async function handleLogout() {
+  if (!supabaseClient) return;
+  setAccountFeedback("正在退出登录...");
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+    setCurrentPlanMeta("", "");
+    setAccountFeedback("已退出登录。");
+  } catch (error) {
+    setAccountFeedback(`退出失败：${error.message}`, true);
+  }
+}
+
+async function savePlanToCloud() {
+  syncTripInputsToState();
+  saveState(false);
+  if (!supabaseClient || !authSession?.user) {
+    setCloudStatus("请先登录后再保存到云端。", true);
+    setActivePage(PAGES.home);
+    return;
+  }
+  els.saveCloudBtn.disabled = true;
+  setCloudStatus("正在保存到云端...");
+  const payload = {
+    owner_id: authSession.user.id,
+    title: state.trip.name?.trim() || "未命名旅行",
+    status: currentPlanStatus === "archived" ? "archived" : "active",
+    start_date: state.trip.startDate || null,
+    end_date: state.trip.endDate || null,
+    travelers: Math.max(1, Number(state.trip.travelers || 1)),
+    snapshot: state,
+    archived_at: currentPlanStatus === "archived" ? new Date().toISOString() : null
+  };
+  try {
+    let result;
+    if (currentPlanId) {
+      result = await supabaseClient
+        .from("trip_plans")
+        .update(payload)
+        .eq("id", currentPlanId)
+        .select("id, status")
+        .single();
+    } else {
+      result = await supabaseClient
+        .from("trip_plans")
+        .insert(payload)
+        .select("id, status")
+        .single();
+    }
+    if (result.error) throw result.error;
+    setCurrentPlanMeta(result.data.id, result.data.status || payload.status);
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setCloudStatus(`云端已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);
+    setAccountFeedback("旅行计划已同步到云端。");
+  } catch (error) {
+    setCloudStatus(`云端保存失败：${error.message}`, true);
+  } finally {
+    els.saveCloudBtn.disabled = false;
+  }
+}
+
+async function loadPlanFromCloud(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再打开云端计划。", true);
+    return;
+  }
+  setAccountFeedback("正在读取云端计划...");
+  try {
+    const { data, error } = await supabaseClient
+      .from("trip_plans")
+      .select("id, status, snapshot")
+      .eq("id", planId)
+      .single();
+    if (error) throw error;
+    state = normalizeState(data.snapshot || {});
+    selectedDayId = state.days[0]?.id || "";
+    setCurrentPlanMeta(data.id, data.status || "");
+    saveState(false);
+    renderAll();
+    setAccountFeedback("已加载云端旅行计划。");
+    setActivePage(PAGES.planner);
+  } catch (error) {
+    setAccountFeedback(`读取计划失败：${error.message}`, true);
+  }
+}
+
+async function archivePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再归档计划。", true);
+    return;
+  }
+  try {
+    const { error } = await supabaseClient
+      .from("trip_plans")
+      .update({ status: "archived", archived_at: new Date().toISOString() })
+      .eq("id", planId);
+    if (error) throw error;
+    if (currentPlanId === planId) setCurrentPlanMeta(planId, "archived");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划已归档。");
+  } catch (error) {
+    setAccountFeedback(`归档失败：${error.message}`, true);
+  }
+}
+
+async function restorePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再取消归档。", true);
+    return;
+  }
+  try {
+    const { error } = await supabaseClient
+      .from("trip_plans")
+      .update({ status: "active", archived_at: null })
+      .eq("id", planId);
+    if (error) throw error;
+    if (currentPlanId === planId) setCurrentPlanMeta(planId, "active");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划已恢复到进行中。");
+  } catch (error) {
+    setAccountFeedback(`取消归档失败：${error.message}`, true);
+  }
+}
+
+async function deletePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再删除计划。", true);
+    return;
+  }
+  const targetPlan = myPlans.find((plan) => plan.id === planId);
+  const confirmed = window.confirm(`确定删除计划“${targetPlan?.title || "未命名旅行"}”吗？此操作不可恢复。`);
+  if (!confirmed) return;
+  try {
+    const { error } = await supabaseClient
+      .from("trip_plans")
+      .delete()
+      .eq("id", planId);
+    if (error) throw error;
+    if (currentPlanId === planId) setCurrentPlanMeta("", "");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划已删除。");
+  } catch (error) {
+    setAccountFeedback(`删除失败：${error.message}`, true);
+  }
+}
+
+async function duplicatePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再复制计划。", true);
+    return;
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from("trip_plans")
+      .select("title, start_date, end_date, travelers, snapshot")
+      .eq("id", planId)
+      .single();
+    if (error) throw error;
+    const copyPayload = {
+      owner_id: authSession.user.id,
+      title: `${data.title || "未命名旅行"} - 副本`,
+      status: "draft",
+      start_date: data.start_date,
+      end_date: data.end_date,
+      travelers: data.travelers || 1,
+      snapshot: data.snapshot || {}
+    };
+    const { error: insertError } = await supabaseClient
+      .from("trip_plans")
+      .insert(copyPayload);
+    if (insertError) throw insertError;
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("已复制为一份新的旅行计划。");
+  } catch (error) {
+    setAccountFeedback(`复制失败：${error.message}`, true);
+  }
+}
+
+function createBlankPlan() {
+  state = createDefaultState();
+  selectedDayId = "";
+  setCurrentPlanMeta("", "");
+  saveState(false);
+  renderAll();
+  setActivePage(PAGES.planner);
+  setAccountFeedback("已创建一份新的本地空白计划。");
+}
+
+async function saveCurrentAsNewPlan() {
+  setCurrentPlanMeta("", "");
+  currentPlanStatus = "";
+  await savePlanToCloud();
+  await loadMyPlans();
+  renderPlanList();
+  renderAuthPanels();
 }
 
 function parseClock(value) {
@@ -857,6 +1578,7 @@ function createMarkerContent(index, kind) {
 }
 
 async function renderMap() {
+  if (activePage !== PAGES.planner || els.plannerPage.hidden) return;
   renderLegend();
   renderRouteSummary();
   const day = state.days.find((entry) => entry.id === els.mapDaySelect.value);
@@ -977,19 +1699,78 @@ function debounceSearch() {
 }
 
 function bindEvents() {
+  els.navHomeBtn.addEventListener("click", () => setActivePage(PAGES.home));
+  els.navPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.showRegisterBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.register));
+  els.showLoginBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.login));
+  els.registerForm.addEventListener("submit", handleRegister);
+  els.loginForm.addEventListener("submit", handleLogin);
+  els.logoutBtn.addEventListener("click", handleLogout);
+  els.brandOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.brandLogoutBtn.addEventListener("click", handleLogout);
+  els.createBlankPlanBtn.addEventListener("click", createBlankPlan);
+  els.saveCurrentAsNewBtn.addEventListener("click", () => {
+    if (!authSession?.user) {
+      setAccountFeedback("请先登录后再另存为新计划。", true);
+      return;
+    }
+    saveCurrentAsNewPlan().catch((error) => {
+      setAccountFeedback(`另存为新计划失败：${error.message}`, true);
+    });
+  });
+  els.planSearchInput.addEventListener("input", () => {
+    planSearchQuery = els.planSearchInput.value.trim();
+    renderPlanList();
+  });
+  els.planSortSelect.addEventListener("change", () => {
+    planSort = els.planSortSelect.value;
+    renderPlanList();
+  });
+  els.planFilterAllBtn.addEventListener("click", () => {
+    planFilter = "all";
+    renderPlanList();
+  });
+  els.planFilterActiveBtn.addEventListener("click", () => {
+    planFilter = "active";
+    renderPlanList();
+  });
+  els.planFilterArchivedBtn.addEventListener("click", () => {
+    planFilter = "archived";
+    renderPlanList();
+  });
+  els.planFilterCurrentBtn.addEventListener("click", () => {
+    planFilter = "current";
+    renderPlanList();
+  });
+  els.refreshPlansBtn.addEventListener("click", async () => {
+    if (!authSession?.user) {
+      setAccountFeedback("请先登录后再刷新计划列表。", true);
+      return;
+    }
+    setAccountFeedback("正在刷新计划列表...");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划列表已刷新。");
+  });
+  els.goPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.openHomeBtn.addEventListener("click", () => setActivePage(PAGES.home));
   [els.tripName, els.travelerCount, els.startDate, els.endDate].forEach((input) => {
     input.addEventListener("change", () => {
       syncTripInputsToState();
       saveState();
+      renderPlannerMeta();
     });
   });
   els.generateDaysBtn.addEventListener("click", generateDays);
   els.saveBtn.addEventListener("click", () => saveState());
+  els.saveCloudBtn.addEventListener("click", savePlanToCloud);
   els.exportBtn.addEventListener("click", () => window.print());
   els.resetBtn.addEventListener("click", () => {
     if (!window.confirm("确定清空本次旅行规划吗？")) return;
     state = createDefaultState();
     selectedDayId = "";
+    setCurrentPlanMeta("", "");
     saveState(false);
     renderAll();
   });
@@ -1025,13 +1806,615 @@ function bindEvents() {
 
 function renderAll() {
   syncStateToTripInputs();
+  renderAuthPanels();
+  renderPlanList();
+  renderPlannerMeta();
   renderPlaces();
   renderDays();
-  renderMap();
+  if (activePage === PAGES.planner) renderMap();
   saveState(false);
 }
 
-bindEvents();
-recalculateAllDays(false);
-renderAll();
-ensureMapReady().catch(() => renderMap());
+function renderPlanStats() {
+  const allCount = myPlans.length;
+  const activeCount = myPlans.filter((plan) => plan.status !== "archived").length;
+  const archivedCount = myPlans.filter((plan) => plan.status === "archived").length;
+  const currentTitle = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId)?.title || "未绑定") : "无";
+  els.planStatAll.textContent = String(allCount);
+  els.planStatActive.textContent = String(activeCount);
+  els.planStatArchived.textContent = String(archivedCount);
+  els.planStatCurrent.textContent = currentTitle;
+  els.homeMetricPlans.textContent = String(allCount);
+  els.homeMetricArchived.textContent = String(archivedCount);
+  els.homeMetricCurrent.textContent = currentPlanId ? currentTitle : "无";
+}
+
+function renderHomeOverview() {
+  const configured = hasSupabaseConfig();
+  const signedIn = Boolean(authSession?.user);
+  if (!signedIn) {
+    els.homeOverviewBadge.textContent = configured ? "访客模式" : "待配置";
+    els.homeOverviewText.textContent = configured
+      ? "先注册或登录账号，再进入功能页规划旅程，并在行程库中长期保存、归档和编辑你的旅行计划。"
+      : "先完成 Supabase 配置，随后即可启用注册登录、云端保存和行程库管理。";
+    return;
+  }
+  const currentTitle = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId)?.title || "当前计划") : "未绑定";
+  els.homeOverviewBadge.textContent = "已登录";
+  els.homeOverviewText.textContent = `当前账号已接入云端行程库，共有 ${myPlans.length} 条计划，当前绑定为 ${currentTitle}。你可以继续去功能页编辑，或在行程库统一管理历史计划。`;
+}
+
+function setActivePage(nextPage) {
+  if (nextPage === PAGES.planner) {
+    activePage = PAGES.planner;
+  } else if (nextPage === PAGES.library) {
+    activePage = PAGES.library;
+  } else {
+    activePage = PAGES.home;
+  }
+  persistStoredValue(PAGE_STORAGE_KEY, activePage);
+  const isHome = activePage === PAGES.home;
+  const isLibrary = activePage === PAGES.library;
+  const isPlanner = activePage === PAGES.planner;
+  els.homePage.hidden = !isHome;
+  els.libraryPage.hidden = !isLibrary;
+  els.plannerPage.hidden = !isPlanner;
+  els.navHomeBtn.classList.toggle("active", isHome);
+  els.navLibraryBtn.classList.toggle("active", isLibrary);
+  els.navPlannerBtn.classList.toggle("active", isPlanner);
+  if (isPlanner) {
+    renderAll();
+    ensureMapReady().catch(() => renderMap());
+  }
+}
+
+function renderAuthPanels() {
+  const configured = hasSupabaseConfig();
+  const signedIn = Boolean(authSession?.user);
+  els.homeGrid.classList.toggle("signed-in", signedIn);
+  els.accountCard.hidden = signedIn;
+  els.supabaseConfigNotice.hidden = configured;
+  els.supabaseConfigNotice.textContent = configured
+    ? ""
+    : "请先在 assets/js/config.local.js 中填写 supabaseUrl 和 supabaseAnonKey。";
+  els.authGuestPanel.hidden = signedIn;
+  els.authUserPanel.hidden = !signedIn;
+  renderHomeOverview();
+  els.authBadge.textContent = signedIn ? "已登录" : "未登录";
+  els.homeAuthBadge.textContent = signedIn ? "账号在线" : (configured ? "未登录" : "待配置");
+  els.brandLogoutBtn.hidden = !signedIn;
+  if (!signedIn) {
+    setAuthView(authView);
+    els.profileDisplayName.textContent = "-";
+    els.profileEmail.textContent = "-";
+    els.profilePlanCount.textContent = "0";
+    els.profileState.textContent = configured ? "待登录" : "待配置";
+    els.brandProfileName.textContent = "未登录";
+    els.brandProfileStatus.textContent = configured ? "待登录" : "待配置";
+    els.brandProfileStatus.classList.remove("archived");
+    els.brandProfileEmail.textContent = configured ? "登录后可查看账号信息" : "请先完成 Supabase 配置";
+    els.brandProfilePlanCount.textContent = "0";
+    els.brandOpenPlannerBtn.textContent = "进入功能页";
+    return;
+  }
+  const displayName = authProfile?.display_name || authSession.user.user_metadata?.display_name || authSession.user.email?.split("@")[0] || "旅行用户";
+  els.profileDisplayName.textContent = displayName;
+  els.profileEmail.textContent = authSession.user.email || "-";
+  els.profilePlanCount.textContent = String(myPlans.length);
+  els.profileState.textContent = "已登录";
+  els.brandProfileName.textContent = displayName;
+  els.brandProfileStatus.textContent = "已登录";
+  els.brandProfileStatus.classList.remove("archived");
+  els.brandProfileEmail.textContent = authSession.user.email || "-";
+  els.brandProfilePlanCount.textContent = String(myPlans.length);
+  els.brandOpenPlannerBtn.textContent = "进入功能页";
+}
+
+function renderPlanList() {
+  els.libraryPlanList.innerHTML = "";
+  renderPlanStats();
+  renderPlanFilters();
+  const plans = getFilteredPlans();
+  const hasPlans = Array.isArray(plans) && plans.length > 0;
+  els.libraryPlanEmpty.hidden = hasPlans;
+  els.libraryPlanEmpty.textContent = myPlans.length
+    ? "当前筛选条件下没有匹配的旅行计划。你可以切换状态、搜索关键词，或者从功能页继续保存新的计划。"
+    : "当前还没有任何旅行计划。你可以先去功能页规划，再保存到云端。";
+  els.planManagerSummary.textContent = `当前显示 ${plans.length} 条计划，共 ${myPlans.length} 条`;
+  if (!hasPlans) return;
+  plans.forEach((plan) => {
+    const article = document.createElement("article");
+    article.className = "plan-card";
+    const statusClass = plan.status === "archived" ? " archived" : "";
+    const isCurrent = currentPlanId === plan.id;
+    const noteText = isCurrent
+      ? "这条计划当前已经与功能页绑定，你可以直接继续编辑并再次保存到云端。"
+      : "可以把这条计划重新载入到功能页继续编辑，也可以复制、归档或删除。";
+    article.innerHTML = `
+      <div class="plan-card-top">
+        <div class="plan-main">
+          <h3>${escapeHtml(plan.title || "未命名旅行")}</h3>
+          <div class="plan-card-meta">
+            <span>${escapeHtml(formatPlanDateRange(plan.start_date, plan.end_date))}</span>
+            <span>${escapeHtml(`出行人数 ${plan.travelers || 1}`)}</span>
+            <span>${escapeHtml(`最近更新 ${new Date(plan.updated_at).toLocaleString("zh-CN")}`)}</span>
+            ${plan.created_at ? `<span>${escapeHtml(`创建于 ${new Date(plan.created_at).toLocaleDateString("zh-CN")}`)}</span>` : ""}
+          </div>
+        </div>
+        <span class="plan-status${statusClass}">${escapeHtml(isCurrent ? "当前绑定" : formatPlanStatus(plan.status))}</span>
+      </div>
+      <p class="plan-card-notes">${escapeHtml(noteText)}</p>
+      <div class="plan-actions"></div>
+    `;
+    const actions = article.querySelector(".plan-actions");
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "small";
+    openBtn.textContent = "继续编辑";
+    openBtn.addEventListener("click", () => loadPlanFromCloud(plan.id));
+    actions.append(openBtn);
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "small ghost";
+    copyBtn.textContent = "复制为新计划";
+    copyBtn.addEventListener("click", () => duplicatePlan(plan.id));
+    actions.append(copyBtn);
+    if (plan.status !== "archived") {
+      const archiveBtn = document.createElement("button");
+      archiveBtn.type = "button";
+      archiveBtn.className = "small ghost";
+      archiveBtn.textContent = "归档";
+      archiveBtn.addEventListener("click", () => archivePlan(plan.id));
+      actions.append(archiveBtn);
+    } else {
+      const restoreBtn = document.createElement("button");
+      restoreBtn.type = "button";
+      restoreBtn.className = "small ghost";
+      restoreBtn.textContent = "取消归档";
+      restoreBtn.addEventListener("click", () => restorePlan(plan.id));
+      actions.append(restoreBtn);
+    }
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "small ghost";
+    deleteBtn.textContent = "删除";
+    deleteBtn.addEventListener("click", () => deletePlan(plan.id));
+    actions.append(deleteBtn);
+    els.libraryPlanList.append(article);
+  });
+}
+
+function bindEvents() {
+  els.navHomeBtn.addEventListener("click", () => setActivePage(PAGES.home));
+  els.navLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.navPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.showRegisterBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.register));
+  els.showLoginBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.login));
+  els.registerForm.addEventListener("submit", handleRegister);
+  els.loginForm.addEventListener("submit", handleLogin);
+  els.logoutBtn.addEventListener("click", handleLogout);
+  els.brandOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.brandLogoutBtn.addEventListener("click", handleLogout);
+  els.createBlankPlanBtn.addEventListener("click", createBlankPlan);
+  els.saveCurrentAsNewBtn.addEventListener("click", () => {
+    if (!authSession?.user) {
+      setAccountFeedback("请先登录后再保存新的云端计划。", true);
+      return;
+    }
+    saveCurrentAsNewPlan().catch((error) => {
+      setAccountFeedback(`另存为新计划失败：${error.message}`, true);
+    });
+  });
+  els.planSearchInput.addEventListener("input", () => {
+    planSearchQuery = els.planSearchInput.value.trim();
+    renderPlanList();
+  });
+  els.planSortSelect.addEventListener("change", () => {
+    planSort = els.planSortSelect.value;
+    renderPlanList();
+  });
+  els.planFilterAllBtn.addEventListener("click", () => {
+    planFilter = "all";
+    renderPlanList();
+  });
+  els.planFilterActiveBtn.addEventListener("click", () => {
+    planFilter = "active";
+    renderPlanList();
+  });
+  els.planFilterArchivedBtn.addEventListener("click", () => {
+    planFilter = "archived";
+    renderPlanList();
+  });
+  els.planFilterCurrentBtn.addEventListener("click", () => {
+    planFilter = "current";
+    renderPlanList();
+  });
+  els.refreshPlansBtn.addEventListener("click", async () => {
+    if (!authSession?.user) {
+      setAccountFeedback("请先登录后再刷新云端计划。", true);
+      return;
+    }
+    setAccountFeedback("正在刷新云端计划...");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("云端计划已刷新。");
+  });
+  els.goPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.homeOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.homeOpenLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.openLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  [els.tripName, els.travelerCount, els.startDate, els.endDate].forEach((input) => {
+    input.addEventListener("change", () => {
+      syncTripInputsToState();
+      saveState();
+      renderPlannerMeta();
+    });
+  });
+  els.generateDaysBtn.addEventListener("click", generateDays);
+  els.saveBtn.addEventListener("click", () => saveState());
+  els.saveCloudBtn.addEventListener("click", savePlanToCloud);
+  els.exportBtn.addEventListener("click", () => window.print());
+  els.resetBtn.addEventListener("click", () => {
+    if (!window.confirm("确认要清空当前功能页中的规划内容吗？")) return;
+    state = createDefaultState();
+    selectedDayId = "";
+    setCurrentPlanMeta("", "");
+    saveState(false);
+    renderAll();
+  });
+  els.mapDaySelect.addEventListener("change", () => renderMap());
+  els.refreshMapBtn.addEventListener("click", () => renderMap());
+  els.searchKeyword.addEventListener("input", debounceSearch);
+  els.searchKeyword.addEventListener("focus", () => {
+    if (suggestions.length) renderSuggestions();
+  });
+  els.searchKeyword.addEventListener("keydown", (event) => {
+    if (!suggestions.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      activeSuggestionIndex = (activeSuggestionIndex + 1) % suggestions.length;
+      renderSuggestions();
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      activeSuggestionIndex = (activeSuggestionIndex - 1 + suggestions.length) % suggestions.length;
+      renderSuggestions();
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const target = suggestions[Math.max(0, activeSuggestionIndex)] || suggestions[0];
+      addPlaceFromSuggestion(target);
+    }
+    if (event.key === "Escape") clearSuggestions();
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".search-input-wrap")) clearSuggestions();
+  });
+}
+
+function getPlanSnapshotSummary(plan) {
+  const snapshot = plan?.snapshot || {};
+  const days = Array.isArray(snapshot.days) ? snapshot.days : [];
+  const places = Array.isArray(snapshot.places) ? snapshot.places : [];
+  const dayCount = days.length || (plan?.start_date && plan?.end_date ? 1 : 0);
+  const itemCount = days.reduce((total, day) => total + (Array.isArray(day.items) ? day.items.length : 0), 0);
+  return {
+    dayCount,
+    placeCount: places.length,
+    itemCount
+  };
+}
+
+function buildPlanMetaList(plan) {
+  const meta = [];
+  meta.push(formatPlanDateRange(plan.start_date, plan.end_date));
+  meta.push(`出行人数 ${plan.travelers || 1}`);
+  if (plan.updated_at) meta.push(`最近更新 ${new Date(plan.updated_at).toLocaleString("zh-CN")}`);
+  if (plan.created_at) meta.push(`创建于 ${new Date(plan.created_at).toLocaleDateString("zh-CN")}`);
+  return meta;
+}
+
+function renderPlanStats() {
+  const allCount = myPlans.length;
+  const activeCount = myPlans.filter((plan) => plan.status !== "archived").length;
+  const archivedCount = myPlans.filter((plan) => plan.status === "archived").length;
+  const currentTitle = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId)?.title || "未绑定") : "无";
+  els.planStatAll.textContent = String(allCount);
+  els.planStatActive.textContent = String(activeCount);
+  els.planStatArchived.textContent = String(archivedCount);
+  els.planStatCurrent.textContent = currentTitle;
+  els.homeMetricPlans.textContent = String(allCount);
+  els.homeMetricArchived.textContent = String(archivedCount);
+  els.homeMetricCurrent.textContent = currentPlanId ? currentTitle : "无";
+}
+
+function renderHomeRecentPlans() {
+  if (!els.homeRecentPlans) return;
+  els.homeRecentPlans.innerHTML = "";
+  const plans = [...myPlans].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 3);
+  els.homeRecentPlansEmpty.hidden = plans.length > 0;
+  if (!plans.length) return;
+  plans.forEach((plan) => {
+    const summary = getPlanSnapshotSummary(plan);
+    const item = document.createElement("article");
+    item.className = `mini-plan-item${currentPlanId === plan.id ? " is-current" : ""}`;
+    item.innerHTML = `
+      <div class="mini-plan-top">
+        <strong class="mini-plan-title">${escapeHtml(plan.title || "未命名旅行")}</strong>
+        <span class="plan-status${plan.status === "archived" ? " archived" : ""}">${escapeHtml(currentPlanId === plan.id ? "当前绑定" : formatPlanStatus(plan.status))}</span>
+      </div>
+      <div class="plan-card-meta">
+        <span>${escapeHtml(formatPlanDateRange(plan.start_date, plan.end_date))}</span>
+        <span>${escapeHtml(`${summary.dayCount || 0} 天`)}</span>
+        <span>${escapeHtml(`${summary.placeCount || 0} 个地点`)}</span>
+      </div>
+    `;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ghost small";
+    button.textContent = "继续编辑";
+    button.addEventListener("click", () => loadPlanFromCloud(plan.id));
+    item.append(button);
+    els.homeRecentPlans.append(item);
+  });
+}
+
+function renderHomeOverview() {
+  const configured = hasSupabaseConfig();
+  const signedIn = Boolean(authSession?.user);
+  if (!signedIn) {
+    els.homeOverviewBadge.textContent = configured ? "访客模式" : "待配置";
+    els.homeOverviewText.textContent = configured
+      ? "先注册或登录账号，再进入功能页规划旅程，并在行程库中长期保存、归档和编辑你的旅行计划。"
+      : "先完成 Supabase 配置，随后即可启用注册登录、云端保存和行程库管理。";
+    if (els.homeSpotlightStatus) {
+      els.homeSpotlightStatus.textContent = "未绑定";
+      els.homeSpotlightStatus.classList.remove("archived");
+      els.homeSpotlightTitle.textContent = "还没有当前计划";
+      els.homeSpotlightText.textContent = "创建或载入一条计划后，这里会显示当前绑定计划的摘要。";
+      els.homeSpotlightMeta.innerHTML = "<span>等待开始</span>";
+    }
+    renderHomeRecentPlans();
+    return;
+  }
+  const currentPlan = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId) || null) : null;
+  els.homeOverviewBadge.textContent = "已登录";
+  els.homeOverviewText.textContent = `当前账号已接入云端行程库，共有 ${myPlans.length} 条计划。你可以继续去功能页编辑，也可以在行程库统一管理和归档历史计划。`;
+  if (currentPlan && els.homeSpotlightStatus) {
+    const summary = getPlanSnapshotSummary(currentPlan);
+    els.homeSpotlightStatus.textContent = currentPlan.status === "archived" ? "已归档" : "当前绑定";
+    els.homeSpotlightStatus.classList.toggle("archived", currentPlan.status === "archived");
+    els.homeSpotlightTitle.textContent = currentPlan.title || "未命名旅行";
+    els.homeSpotlightText.textContent = summary.itemCount
+      ? `当前计划共安排了 ${summary.itemCount} 个行程节点，适合继续在功能页里做细节调整。`
+      : "当前计划已经绑定，但还没有填充具体节点，可以继续去功能页完善。";
+    els.homeSpotlightMeta.innerHTML = buildPlanMetaList(currentPlan)
+      .slice(0, 3)
+      .map((text) => `<span>${escapeHtml(text)}</span>`)
+      .join("");
+  } else if (els.homeSpotlightStatus) {
+    els.homeSpotlightStatus.textContent = "未绑定";
+    els.homeSpotlightStatus.classList.remove("archived");
+    els.homeSpotlightTitle.textContent = "还没有当前计划";
+    els.homeSpotlightText.textContent = "可以去功能页新建一条计划，或者从行程库载入一条已有计划。";
+    els.homeSpotlightMeta.innerHTML = "<span>等待开始</span>";
+  }
+  renderHomeRecentPlans();
+}
+
+function renderPlanList() {
+  els.libraryPlanList.innerHTML = "";
+  renderPlanStats();
+  renderPlanFilters();
+  const plans = getFilteredPlans();
+  const hasPlans = Array.isArray(plans) && plans.length > 0;
+  els.libraryPlanEmpty.hidden = hasPlans;
+  els.libraryPlanEmpty.textContent = myPlans.length
+    ? "当前筛选条件下没有匹配的旅行计划。你可以切换状态、搜索关键词，或者从功能页继续保存新的计划。"
+    : "当前还没有任何旅行计划。你可以先去功能页规划，再保存到云端。";
+  els.planManagerSummary.textContent = `当前显示 ${plans.length} 条计划，共 ${myPlans.length} 条`;
+  if (!hasPlans) {
+    renderHomeRecentPlans();
+    return;
+  }
+  plans.forEach((plan) => {
+    const summary = getPlanSnapshotSummary(plan);
+    const metaList = buildPlanMetaList(plan);
+    const isCurrent = currentPlanId === plan.id;
+    const article = document.createElement("article");
+    article.className = `plan-card${plan.status === "archived" ? " archived" : ""}${isCurrent ? " current" : ""}`;
+    article.innerHTML = `
+      <div class="plan-card-top">
+        <div class="plan-main">
+          <h3>${escapeHtml(plan.title || "未命名旅行")}</h3>
+          <div class="plan-card-meta">
+            ${metaList.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}
+          </div>
+        </div>
+        <span class="plan-status${plan.status === "archived" ? " archived" : ""}">${escapeHtml(isCurrent ? "当前绑定" : formatPlanStatus(plan.status))}</span>
+      </div>
+      <div class="plan-card-summary">
+        <article class="plan-summary-chip">
+          <span>行程天数</span>
+          <strong>${escapeHtml(`${summary.dayCount || 0} 天`)}</strong>
+        </article>
+        <article class="plan-summary-chip">
+          <span>地点数量</span>
+          <strong>${escapeHtml(`${summary.placeCount || 0} 个`)}</strong>
+        </article>
+        <article class="plan-summary-chip">
+          <span>节点数量</span>
+          <strong>${escapeHtml(`${summary.itemCount || 0} 个`)}</strong>
+        </article>
+        <article class="plan-summary-chip">
+          <span>状态</span>
+          <strong>${escapeHtml(isCurrent ? "编辑中" : formatPlanStatus(plan.status))}</strong>
+        </article>
+      </div>
+      <p class="plan-card-notes">${escapeHtml(isCurrent ? "这条计划当前已经与功能页绑定，你可以直接继续编辑并再次保存到云端。" : "可以把这条计划重新载入到功能页继续编辑，也可以复制、归档或删除。")}</p>
+      <div class="plan-actions"></div>
+    `;
+    const actions = article.querySelector(".plan-actions");
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "small";
+    openBtn.textContent = "继续编辑";
+    openBtn.addEventListener("click", () => loadPlanFromCloud(plan.id));
+    actions.append(openBtn);
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "small ghost";
+    copyBtn.textContent = "复制为新计划";
+    copyBtn.addEventListener("click", () => duplicatePlan(plan.id));
+    actions.append(copyBtn);
+    if (plan.status !== "archived") {
+      const archiveBtn = document.createElement("button");
+      archiveBtn.type = "button";
+      archiveBtn.className = "small ghost";
+      archiveBtn.textContent = "归档";
+      archiveBtn.addEventListener("click", () => archivePlan(plan.id));
+      actions.append(archiveBtn);
+    } else {
+      const restoreBtn = document.createElement("button");
+      restoreBtn.type = "button";
+      restoreBtn.className = "small ghost";
+      restoreBtn.textContent = "取消归档";
+      restoreBtn.addEventListener("click", () => restorePlan(plan.id));
+      actions.append(restoreBtn);
+    }
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "small ghost";
+    deleteBtn.textContent = "删除";
+    deleteBtn.addEventListener("click", () => deletePlan(plan.id));
+    actions.append(deleteBtn);
+    els.libraryPlanList.append(article);
+  });
+  renderHomeRecentPlans();
+}
+
+function bindEvents() {
+  els.navHomeBtn.addEventListener("click", () => setActivePage(PAGES.home));
+  els.navLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.navPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.showRegisterBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.register));
+  els.showLoginBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.login));
+  els.registerForm.addEventListener("submit", handleRegister);
+  els.loginForm.addEventListener("submit", handleLogin);
+  els.logoutBtn.addEventListener("click", handleLogout);
+  els.brandOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.brandLogoutBtn.addEventListener("click", handleLogout);
+  els.createBlankPlanBtn.addEventListener("click", createBlankPlan);
+  els.saveCurrentAsNewBtn.addEventListener("click", () => {
+    if (!authSession?.user) {
+      setAccountFeedback("请先登录后再保存新的云端计划。", true);
+      return;
+    }
+    saveCurrentAsNewPlan().catch((error) => {
+      setAccountFeedback(`另存为新计划失败：${error.message}`, true);
+    });
+  });
+  els.planSearchInput.addEventListener("input", () => {
+    planSearchQuery = els.planSearchInput.value.trim();
+    renderPlanList();
+  });
+  els.planSortSelect.addEventListener("change", () => {
+    planSort = els.planSortSelect.value;
+    renderPlanList();
+  });
+  els.planFilterAllBtn.addEventListener("click", () => {
+    planFilter = "all";
+    renderPlanList();
+  });
+  els.planFilterActiveBtn.addEventListener("click", () => {
+    planFilter = "active";
+    renderPlanList();
+  });
+  els.planFilterArchivedBtn.addEventListener("click", () => {
+    planFilter = "archived";
+    renderPlanList();
+  });
+  els.planFilterCurrentBtn.addEventListener("click", () => {
+    planFilter = "current";
+    renderPlanList();
+  });
+  els.refreshPlansBtn.addEventListener("click", async () => {
+    if (!authSession?.user) {
+      setAccountFeedback("请先登录后再刷新云端计划。", true);
+      return;
+    }
+    setAccountFeedback("正在刷新云端计划...");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("云端计划已刷新。");
+  });
+  els.goPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.homeOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.homeOpenLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.homeMiniLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.openLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  [els.tripName, els.travelerCount, els.startDate, els.endDate].forEach((input) => {
+    input.addEventListener("change", () => {
+      syncTripInputsToState();
+      saveState();
+      renderPlannerMeta();
+    });
+  });
+  els.generateDaysBtn.addEventListener("click", generateDays);
+  els.saveBtn.addEventListener("click", () => saveState());
+  els.saveCloudBtn.addEventListener("click", savePlanToCloud);
+  els.exportBtn.addEventListener("click", () => window.print());
+  els.resetBtn.addEventListener("click", () => {
+    if (!window.confirm("确认要清空当前功能页中的规划内容吗？")) return;
+    state = createDefaultState();
+    selectedDayId = "";
+    setCurrentPlanMeta("", "");
+    saveState(false);
+    renderAll();
+  });
+  els.mapDaySelect.addEventListener("change", () => renderMap());
+  els.refreshMapBtn.addEventListener("click", () => renderMap());
+  els.searchKeyword.addEventListener("input", debounceSearch);
+  els.searchKeyword.addEventListener("focus", () => {
+    if (suggestions.length) renderSuggestions();
+  });
+  els.searchKeyword.addEventListener("keydown", (event) => {
+    if (!suggestions.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      activeSuggestionIndex = (activeSuggestionIndex + 1) % suggestions.length;
+      renderSuggestions();
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      activeSuggestionIndex = (activeSuggestionIndex - 1 + suggestions.length) % suggestions.length;
+      renderSuggestions();
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const target = suggestions[Math.max(0, activeSuggestionIndex)] || suggestions[0];
+      addPlaceFromSuggestion(target);
+    }
+    if (event.key === "Escape") clearSuggestions();
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".search-input-wrap")) clearSuggestions();
+  });
+}
+
+async function bootstrap() {
+  bindEvents();
+  renderLocalOpenNotice();
+  recalculateAllDays(false);
+  setAuthView(authView);
+  renderAll();
+  setActivePage(activePage);
+  await initializeSupabase();
+}
+
+bootstrap().catch((error) => {
+  console.error(error);
+  setAuthFeedback(`初始化失败：${error.message}`, true);
+});

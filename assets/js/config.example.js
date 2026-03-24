@@ -1,5 +1,7 @@
-﻿window.APP_CONFIG = {
+window.APP_CONFIG = {
   amapKey: "这里填你的高德 Web 端 Key",
   amapSecurityJsCode: "这里填你的安全密钥 securityJsCode",
-  defaultCity: "上海"
+  defaultCity: "上海",
+  supabaseUrl: "https://YOUR_PROJECT.supabase.co",
+  supabaseAnonKey: "YOUR_SUPABASE_ANON_KEY"
 };

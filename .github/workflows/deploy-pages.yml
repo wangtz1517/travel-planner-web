@@ -34,11 +34,13 @@ jobs:
           AMAP_KEY: ${{ secrets.AMAP_KEY }}
           AMAP_SECURITY_JS_CODE: ${{ secrets.AMAP_SECURITY_JS_CODE }}
           AMAP_DEFAULT_CITY: ${{ vars.AMAP_DEFAULT_CITY }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: |
           mkdir -p dist
           cp -R assets docs scripts index.html LICENSE README.md package.json dist/
           touch dist/.nojekyll
-          node -e "const fs=require('fs'); const path='dist/assets/js/config.js'; const config={amapKey:process.env.AMAP_KEY||'', amapSecurityJsCode:process.env.AMAP_SECURITY_JS_CODE||'', defaultCity:process.env.AMAP_DEFAULT_CITY||'上海'}; fs.writeFileSync(path, 'window.APP_CONFIG = ' + JSON.stringify(config, null, 2) + ';\\n');"
+          node -e "const fs=require('fs'); const path='dist/assets/js/config.js'; const config={amapKey:process.env.AMAP_KEY||'', amapSecurityJsCode:process.env.AMAP_SECURITY_JS_CODE||'', defaultCity:process.env.AMAP_DEFAULT_CITY||'上海', supabaseUrl:process.env.SUPABASE_URL||'https://jwjhfmtohzsddihgynoi.supabase.co', supabaseAnonKey:process.env.SUPABASE_ANON_KEY||'sb_publishable_RMVAvTB2gOLN5obbpEGhVQ_9nTqu7LD'}; fs.writeFileSync(path, 'window.APP_CONFIG = ' + JSON.stringify(config, null, 2) + ';\\n');"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

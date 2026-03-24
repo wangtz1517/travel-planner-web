@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>行旅派 | GoPace</title>
   <meta name="description" content="行旅派 GoPace：支持账号、计划归档与多日路线整理的旅行规划工具">
-  <link rel="icon" type="image/svg+xml" href="logo/logo-symbol-color.svg">
-  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="icon" type="image/svg+xml" href="logo/logo-symbol-color.svg?v=20260324-1">
+  <link rel="stylesheet" href="assets/css/main.css?v=20260324-1">
 </head>
 <body>
   <div class="app-shell">
@@ -433,7 +433,7 @@
     </div>
   </template>
 
-  <script src="assets/js/config.js"></script>
+  <script src="assets/js/config.js?v=20260324-1"></script>
   <script>
     (function loadLocalConfig() {
       const isLocal =
@@ -442,7 +442,7 @@
         window.location.hostname.endsWith(".localhost") ||
         window.location.hostname === "127.0.0.1";
       if (!isLocal) return;
-      document.write('<script src="assets/js/config.local.js"><\/script>');
+      document.write('<script src="assets/js/config.local.js?v=20260324-1"><\/script>');
     })();
 
     window.APP_CONFIG = {
@@ -452,7 +452,7 @@
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/app.js"></script>
+  <script src="assets/js/app.js?v=20260324-1"></script>
 </body>
 </html>
 

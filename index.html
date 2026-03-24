@@ -117,45 +117,52 @@
             </div>
             <span id="homeOverviewBadge" class="status-badge">访客模式</span>
           </div>
-          <p id="homeOverviewText" class="panel-note">在这里管理账号、进入规划功能，并通过行程库统一查看、归档和编辑你的旅行计划。</p>
-          <div class="overview-actions">
-            <button id="homeOpenPlannerBtn" type="button">进入功能页</button>
-            <button id="homeOpenLibraryBtn" type="button" class="ghost">打开行程库</button>
-          </div>
-          <article id="homePlanSpotlight" class="overview-spotlight">
-            <div class="overview-spotlight-head">
-              <span class="eyebrow">Spotlight</span>
-              <span id="homeSpotlightStatus" class="plan-status">未绑定</span>
-            </div>
-            <h3 id="homeSpotlightTitle">还没有当前计划</h3>
-            <p id="homeSpotlightText" class="panel-note">创建或载入一条计划后，这里会显示当前绑定计划的摘要。</p>
-            <div id="homeSpotlightMeta" class="plan-card-meta">
-              <span>等待开始</span>
-            </div>
-          </article>
-          <div class="overview-grid">
-            <div class="overview-metrics">
-              <article class="overview-metric-card">
-                <span>计划总数</span>
-                <strong id="homeMetricPlans">0</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>已归档</span>
-                <strong id="homeMetricArchived">0</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>当前绑定</span>
-                <strong id="homeMetricCurrent">无</strong>
-              </article>
-            </div>
-            <section class="overview-mini-panel">
-              <div class="sub-head">
-                <h3>最近计划</h3>
-                <button id="homeMiniLibraryBtn" type="button" class="ghost small">查看全部</button>
+          <div class="home-overview-shell">
+            <div class="overview-intro-row">
+              <p id="homeOverviewText" class="panel-note overview-intro">在这里管理账号、进入规划功能，并通过行程库统一查看、归档和编辑你的旅行计划。</p>
+              <div class="overview-actions">
+                <button id="homeOpenPlannerBtn" type="button">进入功能页</button>
+                <button id="homeOpenLibraryBtn" type="button" class="ghost">打开行程库</button>
               </div>
-              <div id="homeRecentPlans" class="mini-plan-list"></div>
-              <div id="homeRecentPlansEmpty" class="empty-block" hidden>登录并保存计划后，这里会显示最近更新的行程。</div>
-            </section>
+            </div>
+            <article id="homePlanSpotlight" class="overview-spotlight">
+              <div class="overview-spotlight-head">
+                <span class="eyebrow">Current Plan</span>
+                <span id="homeSpotlightStatus" class="plan-status">未绑定</span>
+              </div>
+              <h3 id="homeSpotlightTitle">还没有当前计划</h3>
+              <p id="homeSpotlightText" class="panel-note">创建或载入一条计划后，这里会显示当前绑定计划的摘要。</p>
+              <div id="homeSpotlightMeta" class="plan-card-meta">
+                <span>等待开始</span>
+              </div>
+            </article>
+            <div class="overview-grid">
+              <div class="overview-metrics">
+                <article class="overview-metric-card">
+                  <span>计划总数</span>
+                  <strong id="homeMetricPlans">0</strong>
+                </article>
+                <article class="overview-metric-card">
+                  <span>已归档</span>
+                  <strong id="homeMetricArchived">0</strong>
+                </article>
+                <article class="overview-metric-card">
+                  <span>进行中</span>
+                  <strong id="homeMetricCurrent">0</strong>
+                </article>
+              </div>
+              <section class="overview-mini-panel">
+                <div class="sub-head">
+                  <div>
+                    <h3>最近计划</h3>
+                    <p class="muted overview-mini-note">从最近更新的路线快速回到编辑状态</p>
+                  </div>
+                  <button id="homeMiniLibraryBtn" type="button" class="ghost small">查看全部</button>
+                </div>
+                <div id="homeRecentPlans" class="mini-plan-list"></div>
+                <div id="homeRecentPlansEmpty" class="empty-block" hidden>登录并保存计划后，这里会显示最近更新的行程。</div>
+              </section>
+            </div>
           </div>
         </section>
 
@@ -188,7 +195,7 @@
               <div id="footprintMapEmpty" class="footprint-map-empty">登录并归档至少一条带城市信息的旅行计划后，这里会开始点亮你的中国足迹地图。</div>
             </div>
             <aside class="footprint-side-panel">
-              <section class="footprint-panel">
+              <section class="footprint-panel footprint-detail-panel">
                 <div class="sub-head">
                   <h3>省份详情</h3>
                   <span id="footprintProvinceMeta" class="muted">点击地图上的省份</span>
@@ -199,7 +206,7 @@
                 <div id="footprintProvinceList" class="footprint-city-list"></div>
                 <div id="footprintProvinceEmpty" class="empty-block">点一下地图里已经点亮的省份，就能查看你在这个省走过的城市。</div>
               </section>
-              <section class="footprint-panel">
+              <section class="footprint-panel footprint-ranking-panel">
                 <div class="sub-head">
                   <h3>旅行热力排名</h3>
                   <span class="muted">按记录城市数排序</span>

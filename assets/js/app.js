@@ -157,6 +157,7 @@ let mapOverlays = [];
 let autocompleteService = null;
 let placeSearchService = null;
 let districtSearchService = null;
+let geocoderService = null;
 let routeServices = {};
 let footprintMapInstance = null;
 let footprintProvinceLayer = null;
@@ -276,6 +277,15 @@ function uid(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function toNumberOrNull(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function normalizeState(raw) {
   const base = createDefaultState();
   const next = { ...base, ...(raw || {}) };
@@ -285,8 +295,8 @@ function normalizeState(raw) {
     name: place.name || "未命名地点",
     city: place.city || "",
     address: place.address || "",
-    lng: typeof place.lng === "number" ? place.lng : null,
-    lat: typeof place.lat === "number" ? place.lat : null,
+    lng: toNumberOrNull(place.lng),
+    lat: toNumberOrNull(place.lat),
     poiId: place.poiId || ""
   })) : [];
   next.days = Array.isArray(next.days) ? next.days.map((day, dayIndex) => ({
@@ -493,6 +503,7 @@ function setAuthView(nextView) {
 function renderAuthPanels() {
   const configured = hasSupabaseConfig();
   const signedIn = Boolean(authSession?.user);
+  els.homePage.classList.toggle("signed-in", signedIn);
   els.homeGrid.classList.toggle("signed-in", signedIn);
   els.accountCard.hidden = signedIn;
   els.supabaseConfigNotice.hidden = configured;
@@ -1533,7 +1544,7 @@ function ensureAmapLoaded() {
       resolve(window.AMap);
     };
     const script = document.createElement("script");
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(amapKey)}&plugin=AMap.AutoComplete,AMap.PlaceSearch,AMap.Walking,AMap.Driving,AMap.Transfer,AMap.Riding,AMap.DistrictSearch&callback=${callbackName}`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(amapKey)}&plugin=AMap.AutoComplete,AMap.PlaceSearch,AMap.Walking,AMap.Driving,AMap.Transfer,AMap.Riding,AMap.DistrictSearch,AMap.Geocoder&callback=${callbackName}`;
     script.async = true;
     script.onerror = () => reject(new Error("高德地图脚本加载失败"));
     document.head.appendChild(script);
@@ -1936,6 +1947,7 @@ function setActivePage(nextPage) {
 function renderAuthPanels() {
   const configured = hasSupabaseConfig();
   const signedIn = Boolean(authSession?.user);
+  els.homePage.classList.toggle("signed-in", signedIn);
   els.homeGrid.classList.toggle("signed-in", signedIn);
   els.accountCard.hidden = signedIn;
   els.supabaseConfigNotice.hidden = configured;
@@ -2180,6 +2192,15 @@ function buildPlanMetaList(plan) {
   return meta;
 }
 
+function buildHomeSpotlightMeta(plan, summary) {
+  return [
+    formatPlanDateRange(plan.start_date, plan.end_date),
+    `${summary.dayCount || 0} 天`,
+    `${summary.placeCount || 0} 个地点`,
+    `${summary.itemCount || 0} 个节点`
+  ];
+}
+
 function renderPlanStats() {
   const allCount = myPlans.length;
   const activeCount = myPlans.filter((plan) => plan.status !== "archived").length;
@@ -2191,7 +2212,7 @@ function renderPlanStats() {
   els.planStatCurrent.textContent = currentTitle;
   els.homeMetricPlans.textContent = String(allCount);
   els.homeMetricArchived.textContent = String(archivedCount);
-  els.homeMetricCurrent.textContent = currentPlanId ? currentTitle : "无";
+  els.homeMetricCurrent.textContent = String(activeCount);
 }
 
 function renderHomeRecentPlans() {
@@ -2280,6 +2301,12 @@ async function ensureFootprintMapReady() {
       extensions: "base"
     });
   }
+  if (!geocoderService) {
+    geocoderService = new AMapRef.Geocoder({
+      radius: 1000,
+      extensions: "base"
+    });
+  }
   return AMapRef;
 }
 
@@ -2306,6 +2333,43 @@ function searchDistrict(keyword) {
   });
 }
 
+function reverseGeocodePlace(place) {
+  return new Promise((resolve) => {
+    if (!geocoderService || typeof place?.lng !== "number" || typeof place?.lat !== "number") {
+      resolve(null);
+      return;
+    }
+    geocoderService.getAddress([place.lng, place.lat], (status, result) => {
+      if (status !== "complete") {
+        resolve(null);
+        return;
+      }
+      const component = result?.regeocode?.addressComponent;
+      if (!component) {
+        resolve(null);
+        return;
+      }
+      const provinceName = String(component.province || "").trim();
+      const cityField = component.city;
+      const districtName = String(component.district || "").trim();
+      const cityName = Array.isArray(cityField)
+        ? String(cityField[0] || "").trim()
+        : String(cityField || "").trim();
+      const provinceMatch = resolveProvinceFromText(`${provinceName} ${cityName} ${districtName}`);
+      if (!provinceMatch?.provinceAdcode) {
+        resolve(null);
+        return;
+      }
+      resolve({
+        cityName: cityName || districtName || stripProvinceSuffix(provinceName) || place.name || "已记录城市",
+        cityAdcode: "",
+        provinceAdcode: provinceMatch.provinceAdcode,
+        provinceName: provinceMatch.provinceName
+      });
+    });
+  });
+}
+
 async function resolvePlaceDistrict(place) {
   const searchTerms = [place.city, place.address, place.name].map((item) => String(item || "").trim()).filter(Boolean);
   for (const term of searchTerms) {
@@ -2320,6 +2384,14 @@ async function resolvePlaceDistrict(place) {
       districtLookupCache.set(term, normalized);
       return normalized;
     }
+  }
+
+  const coordKey = `coords:${place.lng},${place.lat}`;
+  if (districtLookupCache.has(coordKey)) return districtLookupCache.get(coordKey);
+  const reverseResolved = await reverseGeocodePlace(place);
+  if (reverseResolved?.provinceAdcode) {
+    districtLookupCache.set(coordKey, reverseResolved);
+    return reverseResolved;
   }
   return null;
 }
@@ -2426,43 +2498,54 @@ async function renderFootprintMap() {
 function renderHomeOverview() {
   const configured = hasSupabaseConfig();
   const signedIn = Boolean(authSession?.user);
+  const activeCount = myPlans.filter((plan) => plan.status !== "archived").length;
+  const archivedCount = myPlans.filter((plan) => plan.status === "archived").length;
   if (!signedIn) {
     els.homeOverviewBadge.textContent = configured ? "访客模式" : "待配置";
     els.homeOverviewText.textContent = configured
-      ? "先注册或登录账号，再进入功能页规划旅程，并在行程库中长期保存、归档和编辑你的旅行计划。"
-      : "先完成 Supabase 配置，随后即可启用注册登录、云端保存和行程库管理。";
+      ? "登录后，首页会自动聚合当前计划、最近更新和旅行足迹，让这里成为你继续推进旅程的入口。"
+      : "先完成 Supabase 配置，随后即可启用注册登录、云端保存、行程库和足迹地图。";
     if (els.homeSpotlightStatus) {
       els.homeSpotlightStatus.textContent = "未绑定";
       els.homeSpotlightStatus.classList.remove("archived");
       els.homeSpotlightTitle.textContent = "还没有当前计划";
-      els.homeSpotlightText.textContent = "创建或载入一条计划后，这里会显示当前绑定计划的摘要。";
-      els.homeSpotlightMeta.innerHTML = "<span>等待开始</span>";
+      els.homeSpotlightText.textContent = "先登录并创建一条计划，首页就会在这里显示你当前正在推进的旅程摘要。";
+      els.homeSpotlightMeta.innerHTML = "<span>等待绑定</span><span>登录后解锁</span>";
     }
     renderHomeRecentPlans();
     renderFootprintMap().catch(() => {});
     return;
   }
   const currentPlan = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId) || null) : null;
-  els.homeOverviewBadge.textContent = "已登录";
-  els.homeOverviewText.textContent = `当前账号已接入云端行程库，共有 ${myPlans.length} 条计划。你可以继续去功能页编辑，也可以在行程库统一管理和归档历史计划。`;
+  els.homeOverviewBadge.textContent = "云端已连接";
+  els.homeOverviewText.textContent = currentPlan
+    ? `你现在有 ${activeCount} 条进行中计划和 ${archivedCount} 条归档足迹，最适合先从「${currentPlan.title || "未命名旅行"}」继续推进。`
+    : `你现在有 ${activeCount} 条进行中计划和 ${archivedCount} 条归档足迹，可以从功能页开启新旅程，或去行程库挑一条继续编辑。`;
   if (currentPlan && els.homeSpotlightStatus) {
     const summary = getPlanSnapshotSummary(currentPlan);
     els.homeSpotlightStatus.textContent = currentPlan.status === "archived" ? "已归档" : "当前绑定";
     els.homeSpotlightStatus.classList.toggle("archived", currentPlan.status === "archived");
     els.homeSpotlightTitle.textContent = currentPlan.title || "未命名旅行";
-    els.homeSpotlightText.textContent = summary.itemCount
-      ? `当前计划共安排了 ${summary.itemCount} 个行程节点，适合继续在功能页里做细节调整。`
-      : "当前计划已经绑定，但还没有填充具体节点，可以继续去功能页完善。";
-    els.homeSpotlightMeta.innerHTML = buildPlanMetaList(currentPlan)
-      .slice(0, 3)
+    if (currentPlan.status === "archived") {
+      els.homeSpotlightText.textContent = "这条路线已经沉淀为足迹，你仍然可以重新打开、复制为新计划，或在行程库里恢复继续编辑。";
+    } else if (summary.itemCount) {
+      els.homeSpotlightText.textContent = `这条行程已经串起 ${summary.placeCount || 0} 个地点和 ${summary.itemCount} 个节点，继续补充交通和时间会更完整。`;
+    } else if (summary.placeCount) {
+      els.homeSpotlightText.textContent = `当前已经收集 ${summary.placeCount} 个地点，下一步可以把它们安排进每天的路线。`;
+    } else {
+      els.homeSpotlightText.textContent = "当前计划已经绑定，但还没有加入地点；先去功能页挑几个想去的地方会更有推进感。";
+    }
+    els.homeSpotlightMeta.innerHTML = buildHomeSpotlightMeta(currentPlan, summary)
       .map((text) => `<span>${escapeHtml(text)}</span>`)
       .join("");
   } else if (els.homeSpotlightStatus) {
     els.homeSpotlightStatus.textContent = "未绑定";
     els.homeSpotlightStatus.classList.remove("archived");
     els.homeSpotlightTitle.textContent = "还没有当前计划";
-    els.homeSpotlightText.textContent = "可以去功能页新建一条计划，或者从行程库载入一条已有计划。";
-    els.homeSpotlightMeta.innerHTML = "<span>等待开始</span>";
+    els.homeSpotlightText.textContent = activeCount
+      ? "你已经有进行中的计划了，可以从行程库选一条载入到首页，作为当前推进中的旅程。"
+      : "可以去功能页新建一条计划，或者从行程库载入一条已有计划。";
+    els.homeSpotlightMeta.innerHTML = `<span>${activeCount} 条进行中</span><span>${archivedCount} 条已归档</span>`;
   }
   renderHomeRecentPlans();
   renderFootprintMap().catch(() => {});
@@ -2565,6 +2648,49 @@ function getProvinceNameByCode(adcode) {
   return PROVINCE_NAME_MAP[String(adcode || "")] || "未知省份";
 }
 
+function stripProvinceSuffix(name) {
+  return String(name || "")
+    .replace(/(省|市|自治区|特别行政区|壮族自治区|回族自治区|维吾尔自治区)$/u, "")
+    .trim();
+}
+
+function resolveProvinceFromText(text) {
+  const normalizedText = String(text || "").trim();
+  if (!normalizedText) return null;
+
+  const municipalities = [
+    { code: "110000", name: "北京市", aliases: ["北京"] },
+    { code: "120000", name: "天津市", aliases: ["天津"] },
+    { code: "310000", name: "上海市", aliases: ["上海"] },
+    { code: "500000", name: "重庆市", aliases: ["重庆"] }
+  ];
+
+  for (const province of municipalities) {
+    if (province.aliases.some((alias) => normalizedText.includes(alias))) {
+      return {
+        provinceAdcode: province.code,
+        provinceName: province.name,
+        cityAdcode: province.code,
+        cityName: province.aliases[0]
+      };
+    }
+  }
+
+  for (const [code, provinceName] of Object.entries(PROVINCE_NAME_MAP)) {
+    const shortName = stripProvinceSuffix(provinceName);
+    if (normalizedText.includes(provinceName) || (shortName && normalizedText.includes(shortName))) {
+      return {
+        provinceAdcode: code,
+        provinceName,
+        cityAdcode: "",
+        cityName: ""
+      };
+    }
+  }
+
+  return null;
+}
+
 function clearFootprintInfoWindow() {
   if (!footprintInfoWindow || !footprintMapInstance) return;
   footprintInfoWindow.close();
@@ -2603,7 +2729,6 @@ function showFootprintEmptyState(message, badge = "等待点亮") {
   els.footprintMapEmpty.classList.remove("is-hidden");
   clearFootprintMarkers();
   clearFootprintInfoWindow();
-  resetFootprintPanels();
   if (footprintProvinceLayer) {
     if (footprintLayerClickHandler && typeof footprintProvinceLayer.off === "function") {
       footprintProvinceLayer.off("click", footprintLayerClickHandler);
@@ -2620,6 +2745,27 @@ function showFootprintEmptyState(message, badge = "等待点亮") {
 }
 
 async function resolvePlaceDistrict(place) {
+  const rawCity = String(place.city || "").trim();
+  if (/^\d{6}$/.test(rawCity)) {
+    const provinceAdcode = normalizeProvinceAdcode(rawCity);
+    return {
+      cityName: getProvinceNameByCode(rawCity) !== "æœªçŸ¥çœä»½" ? stripProvinceSuffix(getProvinceNameByCode(rawCity)) : (place.name || rawCity),
+      cityAdcode: rawCity,
+      provinceAdcode,
+      provinceName: getProvinceNameByCode(provinceAdcode)
+    };
+  }
+
+  const directProvinceMatch = resolveProvinceFromText([place.city, place.address, place.name].filter(Boolean).join(" "));
+  if (directProvinceMatch) {
+    return {
+      cityName: directProvinceMatch.cityName || rawCity || place.name || "已记录城市",
+      cityAdcode: directProvinceMatch.cityAdcode || "",
+      provinceAdcode: directProvinceMatch.provinceAdcode,
+      provinceName: directProvinceMatch.provinceName
+    };
+  }
+
   const searchTerms = [place.city, place.address, place.name]
     .map((item) => String(item || "").trim())
     .filter(Boolean);
@@ -2638,6 +2784,14 @@ async function resolvePlaceDistrict(place) {
       return normalized;
     }
   }
+
+  const coordKey = `coords:${place.lng},${place.lat}`;
+  if (districtLookupCache.has(coordKey)) return districtLookupCache.get(coordKey);
+  const reverseResolved = await reverseGeocodePlace(place);
+  if (reverseResolved?.provinceAdcode) {
+    districtLookupCache.set(coordKey, reverseResolved);
+    return reverseResolved;
+  }
   return null;
 }
 
@@ -2645,15 +2799,35 @@ function extractFootprintPlaces() {
   return getArchivedPlans()
     .flatMap((plan) => {
       const places = Array.isArray(plan?.snapshot?.places) ? plan.snapshot.places : [];
+      const fallbackName = String(plan?.snapshot?.trip?.name || plan?.title || "").trim();
+      if (!places.length) {
+        if (!fallbackName) return [];
+        return [{
+          name: fallbackName,
+          city: fallbackName,
+          address: "",
+          lng: null,
+          lat: null,
+          __planId: plan.id,
+          __planTitle: plan.title || fallbackName,
+          __planUpdatedAt: plan.updated_at || plan.created_at || "",
+          __source: "plan-fallback"
+        }];
+      }
       return places.map((place) => ({
         ...place,
+        name: String(place?.name || "").trim() || fallbackName || "未命名地点",
+        city: String(place?.city || "").trim() || fallbackName,
+        address: String(place?.address || "").trim() || fallbackName,
+        lng: toNumberOrNull(place?.lng),
+        lat: toNumberOrNull(place?.lat),
         __planId: plan.id,
         __planTitle: plan.title || "未命名行程",
-        __planUpdatedAt: plan.updated_at || plan.created_at || ""
+        __planUpdatedAt: plan.updated_at || plan.created_at || "",
+        __source: (place?.city || place?.address) ? "place" : "place-with-plan-fallback"
       }));
     })
-    .filter((place) => place && (place.city || place.address || place.name))
-    .filter((place) => typeof place.lng === "number" && typeof place.lat === "number");
+    .filter((place) => place && (place.city || place.address || place.name));
 }
 
 function createFootprintProvinceLayer(AMapRef, provinceCodes, activeProvinceCode = "", hoverProvinceCode = "") {
@@ -2789,6 +2963,35 @@ function refreshFootprintProvinceLayer(AMapRef) {
   }
 }
 
+function fitFootprintMapToPositions(positions, AMapRef = window.AMap) {
+  if (!footprintMapInstance || !AMapRef) return false;
+  const validPositions = Array.isArray(positions)
+    ? positions.filter((position) => Array.isArray(position) && Number.isFinite(position[0]) && Number.isFinite(position[1]))
+    : [];
+  if (!validPositions.length) return false;
+
+  if (validPositions.length === 1) {
+    footprintMapInstance.setZoomAndCenter(9.5, validPositions[0]);
+    return true;
+  }
+
+  const lngList = validPositions.map((position) => position[0]);
+  const latList = validPositions.map((position) => position[1]);
+  const southWest = new AMapRef.LngLat(Math.min(...lngList), Math.min(...latList));
+  const northEast = new AMapRef.LngLat(Math.max(...lngList), Math.max(...latList));
+  const bounds = new AMapRef.Bounds(southWest, northEast);
+  footprintMapInstance.setBounds(bounds, false, [72, 72, 72, 72]);
+  return true;
+}
+
+function resetFootprintMapToChinaView() {
+  if (!footprintMapInstance || !window.AMap) return;
+  const chinaSouthWest = new window.AMap.LngLat(69.5, 14.0);
+  const chinaNorthEast = new window.AMap.LngLat(137.5, 56.5);
+  const chinaBounds = new window.AMap.Bounds(chinaSouthWest, chinaNorthEast);
+  footprintMapInstance.setBounds(chinaBounds, false, [36, 36, 36, 36]);
+}
+
 function selectFootprintProvince(provinceCode) {
   if (!provinceCode || !footprintProvinceDataMap.has(provinceCode)) return;
   activeFootprintProvinceCode = provinceCode;
@@ -2798,13 +3001,7 @@ function selectFootprintProvince(provinceCode) {
   renderFootprintRanking();
   if (window.AMap) refreshFootprintProvinceLayer(window.AMap);
   const provinceData = footprintProvinceDataMap.get(provinceCode);
-  if (provinceData?.positions?.length && footprintMapInstance) {
-    footprintMapInstance.setFitView(
-      provinceData.positions.map((position) => new window.AMap.LngLat(position[0], position[1])),
-      false,
-      [72, 72, 72, 72]
-    );
-  }
+  if (provinceData?.positions?.length && footprintMapInstance) fitFootprintMapToPositions(provinceData.positions, window.AMap);
 }
 
 async function renderFootprintMap() {
@@ -2829,7 +3026,7 @@ async function renderFootprintMap() {
 
   const places = extractFootprintPlaces();
   if (!places.length) {
-    showFootprintEmptyState("已归档计划里暂时还没有完整的城市坐标。重新打开计划保存一次后，再归档会更容易点亮。", "等待坐标");
+    showFootprintEmptyState("已归档计划里暂时还没有可识别的地点信息。重新打开计划保存一次后，再归档会更容易点亮。", "等待识别");
     return;
   }
 
@@ -2880,7 +3077,9 @@ async function renderFootprintMap() {
       const provinceEntry = footprintProvinceDataMap.get(provinceCode);
       provinceEntry.cityCount += 1;
       provinceEntry.visitCount += cityEntry.visitCount;
-      provinceEntry.positions.push([cityEntry.lng, cityEntry.lat]);
+      if (typeof cityEntry.lng === "number" && typeof cityEntry.lat === "number") {
+        provinceEntry.positions.push([cityEntry.lng, cityEntry.lat]);
+      }
       provinceEntry.cities.push({
         cityName: cityEntry.cityName,
         cityCode: cityEntry.cityCode,
@@ -2913,54 +3112,26 @@ async function renderFootprintMap() {
 
     clearFootprintMarkers();
     clearFootprintInfoWindow();
-    const infoWindow = createFootprintInfoWindow(AMapRef);
-    footprintMarkers = [...cityMap.values()].map((cityEntry) => {
-      const marker = new AMapRef.Marker({
-        position: [cityEntry.lng, cityEntry.lat],
-        offset: new AMapRef.Pixel(-6, -6),
-        anchor: "center",
-        title: cityEntry.cityName,
-        content: '<span class="visited-city-dot"></span>'
-      });
-      const infoContent = `
-        <div class="footprint-info-window">
-          <strong>${escapeHtml(cityEntry.cityName)}</strong>
-          <span>${escapeHtml(cityEntry.provinceName)}</span>
-          <span>${escapeHtml(cityEntry.visitCount > 1 ? `${cityEntry.visitCount} 条足迹` : "已记录 1 条足迹")}</span>
-        </div>
-      `;
-      marker.on("mouseover", () => {
-        setFootprintHoverState(cityEntry.provinceCode, AMapRef);
-        infoWindow.setContent(infoContent);
-        infoWindow.open(footprintMapInstance, [cityEntry.lng, cityEntry.lat]);
-      });
-      marker.on("mouseout", () => {
-        setFootprintHoverState("", AMapRef);
-        if (infoWindow) infoWindow.close();
-      });
-      marker.on("click", () => {
-        activeFootprintProvinceCode = cityEntry.provinceCode;
-        setFootprintHoverState(cityEntry.provinceCode, AMapRef);
-        renderFootprintProvincePanel();
-        renderFootprintRanking();
-        refreshFootprintProvinceLayer(AMapRef);
-        infoWindow.setContent(infoContent);
-        infoWindow.open(footprintMapInstance, [cityEntry.lng, cityEntry.lat]);
+    footprintMarkers = [...cityMap.values()]
+      .filter((cityEntry) => typeof cityEntry.lng === "number" && typeof cityEntry.lat === "number")
+      .map((cityEntry) => {
+      const marker = new AMapRef.CircleMarker({
+        center: [cityEntry.lng, cityEntry.lat],
+        radius: 6,
+        strokeColor: "rgba(255, 250, 244, 0.96)",
+        strokeWeight: 2,
+        strokeOpacity: 1,
+        fillColor: "#cd8147",
+        fillOpacity: 0.95,
+        bubble: true,
+        zIndex: 22,
+        cursor: "default"
       });
       return marker;
     });
     footprintMarkers.forEach((marker) => footprintMapInstance.add(marker));
 
-    const activeProvince = footprintProvinceDataMap.get(activeFootprintProvinceCode);
-    if (activeProvince?.positions?.length) {
-      footprintMapInstance.setFitView(
-        activeProvince.positions.map((position) => new AMapRef.LngLat(position[0], position[1])),
-        false,
-        [72, 72, 72, 72]
-      );
-    } else {
-      footprintMapInstance.setZoomAndCenter(4.2, [104.5, 35.2]);
-    }
+    resetFootprintMapToChinaView();
     footprintMapInstance.resize();
   } catch (error) {
     showFootprintEmptyState(`足迹地图加载失败：${error.message}`, "加载失败");

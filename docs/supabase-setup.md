@@ -97,8 +97,9 @@
 
 建议：
 
-- 在自定义域名 `gopace.cn` 生效前，可以先把 `Site URL` 设置为 GitHub Pages 地址
-- 等自定义域名完全可用后，再把 `Site URL` 切到 `https://gopace.cn`
+- 正式环境的 `Site URL` 建议设置为 `https://www.gopace.cn`
+- 本地调试不要删掉 `http://travel-planner.localhost:8080` 和 `http://travel-planner.localhost:8080/`
+- 如果后续给裸域 `gopace.cn` 做了跳转，可以继续把它保留在 `Redirect URLs`
 
 ### 4.4 配置发信
 

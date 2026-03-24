@@ -23,3 +23,10 @@
 - 云端保存链路改为通过 `save_trip_plan` RPC 执行，明确返回单条计划记录。
 - 修复本地残留 `currentPlanId` 导致“新建计划误走更新”以及 `Plan not found or no permission to update` 的问题。
 - 新增 [supabase-save-trip-plan.sql](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/supabase-save-trip-plan.sql)，用于在 Supabase 中创建稳定的保存函数。
+
+## V17
+
+- 首页完成第二轮重排：已登录状态下改为 `旅行概览 / 已走过的城市` 双栏首屏，并统一模块高度与内部滚动逻辑。
+- 旅行概览重构为“简介入口 + 当前计划 Spotlight + 指标 + 最近计划”的层级结构，首页信息更聚焦。
+- 足迹地图优化默认中国视角、纯圆点城市标记与省份详情面板交互。
+- 正式域名切换为 [www.gopace.cn](https://www.gopace.cn)，并同步更新部署与环境配置文档。

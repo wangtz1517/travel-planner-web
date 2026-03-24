@@ -5,6 +5,12 @@
 在线使用地址：
 
 ```text
+https://www.gopace.cn/
+```
+
+备用地址：
+
+```text
 https://wangtz1517.github.io/travel-planner-web/
 ```
 

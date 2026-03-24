@@ -67,6 +67,37 @@
 https://<你的用户名>.github.io/<仓库名>/
 ```
 
+当前项目的正式使用域名建议为：
+
+```text
+https://www.gopace.cn/
+```
+
+GitHub Pages 原始地址可以继续保留为备用访问地址。
+
+## 4.1 绑定自定义域名 www.gopace.cn
+
+进入：
+
+- `Settings` -> `Pages`
+
+在 `Custom domain` 中填写：
+
+```text
+www.gopace.cn
+```
+
+保存后，去腾讯云 DNSPod 添加以下记录：
+
+- `CNAME`，主机记录 `www`，记录值 `wangtz1517.github.io`
+
+说明：
+
+- `www` 的记录值只写 `wangtz1517.github.io`，不要带仓库名和路径
+- 当前项目使用的是 GitHub Actions 部署，不依赖仓库根目录的 `CNAME` 文件
+- 等解析生效后，可以回到 `Settings -> Pages` 勾选 `Enforce HTTPS`
+- 如果后续要让裸域 `gopace.cn` 也可访问，可以再通过域名服务商做跳转到 `https://www.gopace.cn`
+
 ## 5. 高德 Key 的注意事项
 
 即使通过 GitHub Secrets 注入，最终生成的前端 `config.js` 仍然会出现在公开网页里，所以这不是“隐藏密钥”，只是避免把真实值直接提交进仓库历史。
@@ -76,16 +107,17 @@ https://<你的用户名>.github.io/<仓库名>/
 1. 给 Key 配置允许访问的域名白名单
 2. 不要把无限制 Key 用在公开网站上
 
-如果你的 Pages 域名是：
+如果你的正式域名是：
 
 ```text
-https://yourname.github.io/travel-planner-web/
+https://www.gopace.cn/
 ```
 
 通常需要把类似下面的域名加入白名单：
 
 ```text
-yourname.github.io
+www.gopace.cn
+wangtz1517.github.io
 ```
 
 具体以高德控制台要求为准。

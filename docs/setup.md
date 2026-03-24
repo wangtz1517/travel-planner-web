@@ -51,7 +51,7 @@ http://travel-planner.localhost:8080
 线上正式地址是：
 
 ```text
-https://wangtz1517.github.io/travel-planner-web/
+https://www.gopace.cn/
 ```
 
 ## 4. 不要直接打开 index.html

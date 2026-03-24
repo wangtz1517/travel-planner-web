@@ -2654,9 +2654,9 @@ function stripProvinceSuffix(name) {
     .trim();
 }
 
-function resolveProvinceFromText(text) {
+function findProvinceMatchesInText(text) {
   const normalizedText = String(text || "").trim();
-  if (!normalizedText) return null;
+  if (!normalizedText) return [];
 
   const municipalities = [
     { code: "110000", name: "北京市", aliases: ["北京"] },
@@ -2664,31 +2664,43 @@ function resolveProvinceFromText(text) {
     { code: "310000", name: "上海市", aliases: ["上海"] },
     { code: "500000", name: "重庆市", aliases: ["重庆"] }
   ];
+  const matches = [];
+
+  const pushMatch = (match) => {
+    if (!match?.provinceAdcode) return;
+    if (matches.some((item) => item.provinceAdcode === match.provinceAdcode)) return;
+    matches.push(match);
+  };
 
   for (const province of municipalities) {
     if (province.aliases.some((alias) => normalizedText.includes(alias))) {
-      return {
+      pushMatch({
         provinceAdcode: province.code,
         provinceName: province.name,
         cityAdcode: province.code,
         cityName: province.aliases[0]
-      };
+      });
     }
   }
 
   for (const [code, provinceName] of Object.entries(PROVINCE_NAME_MAP)) {
     const shortName = stripProvinceSuffix(provinceName);
     if (normalizedText.includes(provinceName) || (shortName && normalizedText.includes(shortName))) {
-      return {
+      pushMatch({
         provinceAdcode: code,
         provinceName,
         cityAdcode: "",
         cityName: ""
-      };
+      });
     }
   }
 
-  return null;
+  return matches;
+}
+
+function resolveProvinceFromText(text) {
+  const matches = findProvinceMatchesInText(text);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function clearFootprintInfoWindow() {
@@ -2756,8 +2768,25 @@ async function resolvePlaceDistrict(place) {
     };
   }
 
-  const directProvinceMatch = resolveProvinceFromText([place.city, place.address, place.name].filter(Boolean).join(" "));
-  if (directProvinceMatch) {
+  const textFields = [place.city, place.address, place.name]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((value, index, list) => list.indexOf(value) === index);
+
+  // Coordinates are more reliable than route titles or fallback text when a single plan crosses multiple provinces.
+  if (typeof place.lng === "number" && typeof place.lat === "number") {
+    const coordKey = `coords:${place.lng},${place.lat}`;
+    if (districtLookupCache.has(coordKey)) return districtLookupCache.get(coordKey);
+    const reverseResolved = await reverseGeocodePlace(place);
+    if (reverseResolved?.provinceAdcode) {
+      districtLookupCache.set(coordKey, reverseResolved);
+      return reverseResolved;
+    }
+  }
+
+  for (const term of textFields) {
+    const directProvinceMatch = resolveProvinceFromText(term);
+    if (!directProvinceMatch) continue;
     return {
       cityName: directProvinceMatch.cityName || rawCity || place.name || "已记录城市",
       cityAdcode: directProvinceMatch.cityAdcode || "",
@@ -2766,9 +2795,7 @@ async function resolvePlaceDistrict(place) {
     };
   }
 
-  const searchTerms = [place.city, place.address, place.name]
-    .map((item) => String(item || "").trim())
-    .filter(Boolean);
+  const searchTerms = textFields.filter((term) => findProvinceMatchesInText(term).length <= 1);
   for (const term of searchTerms) {
     if (districtLookupCache.has(term)) return districtLookupCache.get(term);
     const district = await searchDistrict(term);
@@ -2783,6 +2810,16 @@ async function resolvePlaceDistrict(place) {
       districtLookupCache.set(term, normalized);
       return normalized;
     }
+  }
+
+  const combinedProvinceMatch = resolveProvinceFromText(textFields.join(" "));
+  if (combinedProvinceMatch) {
+    return {
+      cityName: combinedProvinceMatch.cityName || rawCity || place.name || "已记录城市",
+      cityAdcode: combinedProvinceMatch.cityAdcode || "",
+      provinceAdcode: combinedProvinceMatch.provinceAdcode,
+      provinceName: combinedProvinceMatch.provinceName
+    };
   }
 
   const coordKey = `coords:${place.lng},${place.lat}`;

@@ -1,4 +1,4 @@
-# 本地维护与使用说明
+# 本地开发与维护指南
 
 这份说明主要用于以后继续维护这个网页时快速查看，避免忘记本地启动和预览方式。
 
@@ -91,10 +91,15 @@ file:///C:/.../index.html
 
 - `assets/js/config.js`
 
-### 需求和说明文档
+### 文档入口
 
-- `docs/requirements.md`
-- `docs/setup.md`
+- `docs/README.md`
+- `docs/product/requirements.md`
+- `docs/product/changelog.md`
+- `docs/product/release-notes.md`
+- `docs/development/local-development.md`
+- `docs/deployment/github-pages.md`
+- `docs/backend/supabase.md`
 
 ## 6. 如果本地地图或搜索失效
 

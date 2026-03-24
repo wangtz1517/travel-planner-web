@@ -1,4 +1,4 @@
-# GitHub Pages 发布说明
+# GitHub Pages 部署指南
 
 这份项目可以直接作为静态站点发布到 GitHub Pages。
 

@@ -252,6 +252,11 @@ to authenticated
 using (user_id = (select auth.uid()));
 ```
 
+补充说明：
+
+- 旅行计划云端保存的 RPC 脚本单独维护在 `docs/backend/sql/001-save-trip-plan.sql`
+- 后续如果新增数据库函数或迁移脚本，也统一放到 `docs/backend/sql/` 目录下
+
 ## 6. 前端配置建议
 
 你当前项目已经有 `assets/js/config.js` 机制，所以后面接 Supabase 时建议直接扩展这个配置对象。

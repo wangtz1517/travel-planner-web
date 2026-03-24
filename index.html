@@ -376,7 +376,25 @@
   </template>
 
   <script src="assets/js/config.js"></script>
-  <script src="assets/js/config.local.js"></script>
+  <script>
+    (function loadLocalConfig() {
+      const isLocal =
+        window.location.protocol === "file:" ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname.endsWith(".localhost") ||
+        window.location.hostname === "127.0.0.1";
+      if (!isLocal) return;
+      const script = document.createElement("script");
+      script.src = "assets/js/config.local.js";
+      document.head.appendChild(script);
+    })();
+
+    window.APP_CONFIG = {
+      ...(window.APP_CONFIG || {}),
+      supabaseUrl: (window.APP_CONFIG && window.APP_CONFIG.supabaseUrl) || "https://jwjhfmtohzsddihgynoi.supabase.co",
+      supabaseAnonKey: (window.APP_CONFIG && window.APP_CONFIG.supabaseAnonKey) || "sb_publishable_RMVAvTB2gOLN5obbpEGhVQ_9nTqu7LD"
+    };
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/app.js"></script>
 </body>

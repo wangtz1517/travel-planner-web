@@ -7,7 +7,10 @@
     "dev": "node scripts/server.js",
     "start": "node scripts/server.js",
     "dev:lan": "node scripts/server.js --host 0.0.0.0",
-    "dev:8081": "node scripts/server.js --port 8081"
+    "dev:8081": "node scripts/server.js --port 8081",
+    "docs:guard": "node scripts/release-workflow.js check",
+    "release:guard": "node scripts/release-workflow.js check --release",
+    "release:prepare": "node scripts/release-workflow.js scaffold --release"
   },
   "engines": {
     "node": ">=18"

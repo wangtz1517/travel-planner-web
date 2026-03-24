@@ -160,6 +160,10 @@
 - 当前仓库只有 GitHub Pages 部署工作流
 - 当前没有“自动生成 changelog / release notes”的 GitHub Action
 - 因此发布文档维护方式仍然是“人工触发 + Codex 协助整理”
+- 当前仓库新增了可执行脚本 `scripts/release-workflow.js`
+- 日常校验可使用 `npm run docs:guard`
+- 正式发布校验可使用 `npm run release:guard`
+- 创建新的发布模板可使用 `npm run release:prepare -- --version Vxx --date YYYY-MM-DD --commit <hash>`
 
 ## 5. 协作执行规则
 

@@ -150,3 +150,9 @@
 
 - 修复首页“旅行概览”中“最近计划”列表超过可视范围后无法滚动的问题；现在该列表会在卡片内部独立滚动，不再把整个概览区域撑开。
 - 补充 `V20` 的正式发布说明到 [release-notes.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/product/release-notes.md)，统一线上版本与发布文档记录。
+
+## V21
+
+- 新增 [release-workflow.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/scripts/release-workflow.js)，将 `AGENTS.md` 中约定的发布校验与版本文档流程落成可执行脚本。
+- 新增 `npm run docs:guard`、`npm run release:guard` 与 `npm run release:prepare`，用于检查 `changelog / release-notes` 是否按规则更新，并生成新版本模板。
+- 同步更新 [AGENTS.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/AGENTS.md) 与 [release-workflow.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/deployment/release-workflow.md)，让项目规则和脚本命令保持一致。

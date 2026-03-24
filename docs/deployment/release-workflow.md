@@ -75,6 +75,15 @@
 - 版本文档由我按固定模板帮你维护
 - GitHub Pages 仍然只负责部署，不负责自动写文档
 
+当前仓库已经补充了脚本化支持：
+
+- `npm run docs:guard`
+  检查当前改动是否遗漏了 `docs/product/changelog.md`
+- `npm run release:guard`
+  按正式发布标准检查当前改动是否同时更新了 `changelog` 和 `release-notes`
+- `npm run release:prepare -- --version Vxx --date YYYY-MM-DD --commit <hash>`
+  自动在 `changelog` 和 `release-notes` 中生成新的版本模板
+
 ## 5. 建议的版本更新格式
 
 ### 5.1 Changelog 模板
@@ -139,4 +148,4 @@
 
 - 当前仓库只有 GitHub Pages 部署工作流
 - 没有“发布后自动生成 changelog / release notes”的脚本或 GitHub Action
-- 因此版本文档目前是“人工触发 + Codex 协助整理”的模式
+- 但现在已经有本地脚本用于校验与生成模板，因此版本文档已经从“纯人工”升级为“人工触发 + 脚本校验/生成 + Codex 协助整理”的模式

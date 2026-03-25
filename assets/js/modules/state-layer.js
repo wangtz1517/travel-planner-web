@@ -53,6 +53,7 @@ var els = {
   registerPassword: document.getElementById("registerPassword"),
   loginEmail: document.getElementById("loginEmail"),
   loginPassword: document.getElementById("loginPassword"),
+  enterGuestModeBtn: document.getElementById("enterGuestModeBtn"),
   registerSubmitBtn: document.getElementById("registerSubmitBtn"),
   loginSubmitBtn: document.getElementById("loginSubmitBtn"),
   authFeedback: document.getElementById("authFeedback"),

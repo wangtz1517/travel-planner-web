@@ -1,16 +1,37 @@
 // Bootstrap entry for GoPace frontend.
 
+const originalRenderAuthPanels = renderAuthPanels;
+renderAuthPanels = function wrappedRenderAuthPanels() {
+  originalRenderAuthPanels();
+  const signedIn = Boolean(authSession?.user);
+  els.authBadge.textContent = signedIn ? "退出登录" : "游客模式";
+  els.authBadge.disabled = !signedIn;
+  els.authBadge.classList.toggle("is-actionable", signedIn);
+  els.authBadge.title = signedIn ? "点击退出当前账号" : "当前未登录";
+  if (!signedIn && hasSupabaseConfig()) {
+    els.homeOverviewText.textContent = "现在可以直接以游客模式进入功能页体验路线规划和本地保存；如果需要云端保存、同步和行程库管理，再登录账号即可。";
+  }
+};
+
+function handleGuestAccess() {
+  setAuthFeedback("当前为游客模式。你可以直接体验规划功能并保存到本地，云端保存与行程库功能需要登录后使用。");
+  setAccountFeedback("");
+  setActivePage(PAGES.planner);
+}
+
 function bindEvents() {
   els.navHomeBtn.addEventListener("click", () => setActivePage(PAGES.home));
   els.navLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
   els.navPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.authBadge.addEventListener("click", () => {
+    if (authSession?.user) handleLogout();
+  });
   els.showRegisterBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.register));
   els.showLoginBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.login));
   els.registerForm.addEventListener("submit", handleRegister);
   els.loginForm.addEventListener("submit", handleLogin);
+  els.enterGuestModeBtn.addEventListener("click", handleGuestAccess);
   els.logoutBtn.addEventListener("click", handleLogout);
-  els.brandOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
-  els.brandLogoutBtn.addEventListener("click", handleLogout);
   els.createBlankPlanBtn.addEventListener("click", createBlankPlan);
   els.saveCurrentAsNewBtn.addEventListener("click", () => {
     if (!authSession?.user) {

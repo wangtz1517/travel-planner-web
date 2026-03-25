@@ -29,7 +29,7 @@
             <span>计划数量</span>
             <strong id="brandProfilePlanCount">0</strong>
           </div>
-          <div class="brand-popover-actions">
+          <div class="brand-popover-actions" hidden>
             <button id="brandOpenPlannerBtn" type="button" class="small">进入功能页</button>
             <button id="brandLogoutBtn" type="button" class="small ghost">退出登录</button>
           </div>
@@ -41,7 +41,7 @@
             <button id="navLibraryBtn" type="button" class="nav-tab">行程库</button>
             <button id="navPlannerBtn" type="button" class="nav-tab">功能页</button>
           </nav>
-          <span id="authBadge" class="status-badge">未登录</span>
+          <button id="authBadge" type="button" class="status-badge auth-badge-button" disabled>游客模式</button>
         </div>
     </header>
 
@@ -78,6 +78,11 @@
               <label><span>密码</span><input id="loginPassword" type="password" placeholder="输入密码" autocomplete="current-password"></label>
               <button id="loginSubmitBtn" type="submit">登录</button>
             </form>
+
+            <div class="guest-entry">
+              <p class="panel-note">不登录也可以先进入功能页体验路线规划和本地保存，云端保存与行程库仍需登录后使用。</p>
+              <button id="enterGuestModeBtn" type="button" class="ghost">游客体验</button>
+            </div>
 
             <p id="authFeedback" class="panel-note"></p>
           </div>

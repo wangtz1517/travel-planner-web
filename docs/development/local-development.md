@@ -83,9 +83,18 @@ file:///C:/.../index.html
 
 - `assets/css/main.css`
 
-### 交互逻辑
+### 前端启动入口
 
 - `assets/js/app.js`
+
+### 前端分层脚本
+
+- `assets/js/modules/state-layer.js`
+- `assets/js/modules/auth-layer.js`
+- `assets/js/modules/planner-layer.js`
+- `assets/js/modules/map-layer.js`
+- `assets/js/modules/footprint-layer.js`
+- `assets/js/modules/render-layer.js`
 
 ### 本地高德配置
 
@@ -98,6 +107,7 @@ file:///C:/.../index.html
 - `docs/product/changelog.md`
 - `docs/product/release-notes.md`
 - `docs/development/local-development.md`
+- `docs/development/project-architecture.md`
 - `docs/deployment/github-pages.md`
 - `docs/backend/supabase.md`
 

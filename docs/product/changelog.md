@@ -156,3 +156,23 @@
 - 新增 [release-workflow.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/scripts/release-workflow.js)，将 `AGENTS.md` 中约定的发布校验与版本文档流程落成可执行脚本。
 - 新增 `npm run docs:guard`、`npm run release:guard` 与 `npm run release:prepare`，用于检查 `changelog / release-notes` 是否按规则更新，并生成新版本模板。
 - 同步更新 [AGENTS.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/AGENTS.md) 与 [release-workflow.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/deployment/release-workflow.md)，让项目规则和脚本命令保持一致。
+
+## V22
+
+- 新增 [project-architecture.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/development/project-architecture.md)，梳理当前版本的文件职责、代码关系图与整体系统逻辑关系图，便于后续继续迭代时快速理解工程结构。
+- 更新 [docs/README.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/README.md) 与 [local-development.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/development/local-development.md)，把新架构文档纳入现有文档索引和开发入口。
+
+## V23
+
+- 将 [app.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/app.js) 重构为仅负责启动与事件绑定的轻量入口，并新增 `assets/js/modules/` 分层脚本目录。
+- 按“状态层 / 认证层 / 规划层 / 地图层 / 足迹层 / 页面渲染层”拆分前端逻辑，分别落入：
+  - [state-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/state-layer.js)
+  - [auth-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/auth-layer.js)
+  - [planner-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/planner-layer.js)
+  - [map-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/map-layer.js)
+  - [footprint-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/footprint-layer.js)
+  - [render-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/render-layer.js)
+- 清理原 `app.js` 中同名函数重复定义的问题，保留当前最终生效的版本，避免后续修改误改到未生效逻辑。
+- 将首页、行程库、功能页的主要渲染逻辑迁入 [render-layer.js](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/assets/js/modules/render-layer.js)，降低总控文件与页面逻辑的耦合。
+- 更新 [index.html](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/index.html)、[project-architecture.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/development/project-architecture.md) 与 [local-development.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/development/local-development.md)，同步新的前端结构与入口说明。
+- 正式发布前同步补齐 [release-notes.md](/C:/Users/23326/Desktop/BaiduSyncdisk/Codex/旅行规划网页/docs/product/release-notes.md)，记录本次工程重构版本的发布摘要。

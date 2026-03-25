@@ -1,0 +1,351 @@
+function getSupabaseClient() {
+  if (supabaseClient || !hasSupabaseConfig() || !window.supabase?.createClient) return supabaseClient;
+  const { supabaseUrl, supabaseAnonKey } = getConfig();
+  supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+  return supabaseClient;
+}
+
+async function initializeSupabase() {
+  const client = getSupabaseClient();
+  renderAuthPanels();
+  renderPlannerMeta();
+  renderPlanList();
+  if (!client) return;
+  const { data, error } = await client.auth.getSession();
+  if (error) {
+    setAuthFeedback(`登录态读取失败：${error.message}`, true);
+  }
+  authSession = data?.session || null;
+  await refreshAccountData();
+  client.auth.onAuthStateChange((_event, session) => {
+    authSession = session || null;
+    refreshAccountData().catch((authError) => {
+      setAccountFeedback(`账号状态刷新失败：${authError.message}`, true);
+    });
+  });
+}
+
+async function refreshAccountData() {
+  authProfile = null;
+  if (!authSession?.user) {
+    myPlans = [];
+    renderAuthPanels();
+    renderPlanList();
+    renderPlannerMeta();
+    return;
+  }
+  await Promise.all([loadProfile(), loadMyPlans()]);
+  renderAuthPanels();
+  renderPlanList();
+  renderPlannerMeta();
+}
+
+async function loadProfile() {
+  if (!authSession?.user || !supabaseClient) return null;
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, email, display_name, avatar_url, created_at, updated_at")
+    .eq("id", authSession.user.id)
+    .maybeSingle();
+  if (error) {
+    setAccountFeedback(`读取个人资料失败：${error.message}`, true);
+    return null;
+  }
+  authProfile = data || null;
+  return authProfile;
+}
+
+async function loadMyPlans() {
+  if (!authSession?.user || !supabaseClient) {
+    myPlans = [];
+    return myPlans;
+  }
+  const { data, error } = await supabaseClient
+    .from("trip_plans")
+    .select("id, title, status, start_date, end_date, travelers, snapshot, updated_at, created_at, archived_at")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    setAccountFeedback(`读取旅行计划失败：${error.message}`, true);
+    myPlans = [];
+    return myPlans;
+  }
+  myPlans = data || [];
+  return myPlans;
+}
+
+async function handleRegister(event) {
+  event.preventDefault();
+  if (!hasSupabaseConfig()) {
+    setAuthFeedback("请先配置 Supabase URL 和 anon key。", true);
+    return;
+  }
+  const email = els.registerEmail.value.trim();
+  const password = els.registerPassword.value;
+  const displayName = els.registerDisplayName.value.trim();
+  if (!email || !password) {
+    setAuthFeedback("请先填写邮箱和密码。", true);
+    return;
+  }
+  els.registerSubmitBtn.disabled = true;
+  setAuthFeedback("正在注册账号...");
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: displayName }
+      }
+    });
+    if (error) throw error;
+    if (data.session) {
+      setAuthFeedback("注册成功，已自动登录。");
+      els.registerForm.reset();
+    } else {
+      setAuthFeedback("注册成功，请先到邮箱完成确认，然后再登录。");
+      setAuthView(AUTH_VIEWS.login);
+    }
+  } catch (error) {
+    setAuthFeedback(`注册失败：${error.message}`, true);
+  } finally {
+    els.registerSubmitBtn.disabled = false;
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  if (!hasSupabaseConfig()) {
+    setAuthFeedback("请先配置 Supabase URL 和 anon key。", true);
+    return;
+  }
+  const email = els.loginEmail.value.trim();
+  const password = els.loginPassword.value;
+  if (!email || !password) {
+    setAuthFeedback("请先填写邮箱和密码。", true);
+    return;
+  }
+  els.loginSubmitBtn.disabled = true;
+  setAuthFeedback("正在登录...");
+  try {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    setAuthFeedback("登录成功。");
+    els.loginForm.reset();
+  } catch (error) {
+    setAuthFeedback(`登录失败：${error.message}`, true);
+  } finally {
+    els.loginSubmitBtn.disabled = false;
+  }
+}
+
+async function handleLogout() {
+  if (!supabaseClient) return;
+  setAccountFeedback("正在退出登录...");
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+    setCurrentPlanMeta("", "");
+    setAccountFeedback("已退出登录。");
+  } catch (error) {
+    setAccountFeedback(`退出失败：${error.message}`, true);
+  }
+}
+
+async function loadPlanFromCloud(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再打开云端计划。", true);
+    return;
+  }
+  setAccountFeedback("正在读取云端计划...");
+  try {
+    const { data, error } = await supabaseClient
+      .from("trip_plans")
+      .select("id, status, snapshot")
+      .eq("id", planId)
+      .single();
+    if (error) throw error;
+    state = normalizeState(data.snapshot || {});
+    selectedDayId = state.days[0]?.id || "";
+    setCurrentPlanMeta(data.id, data.status || "");
+    saveState(false);
+    renderAll();
+    setAccountFeedback("已加载云端旅行计划。");
+    setActivePage(PAGES.planner);
+  } catch (error) {
+    setAccountFeedback(`读取计划失败：${error.message}`, true);
+  }
+}
+
+async function archivePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再归档计划。", true);
+    return;
+  }
+  try {
+    const { error } = await supabaseClient
+      .from("trip_plans")
+      .update({ status: "archived", archived_at: new Date().toISOString() })
+      .eq("id", planId);
+    if (error) throw error;
+    if (currentPlanId === planId) setCurrentPlanMeta(planId, "archived");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划已归档。");
+  } catch (error) {
+    setAccountFeedback(`归档失败：${error.message}`, true);
+  }
+}
+
+async function restorePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再取消归档。", true);
+    return;
+  }
+  try {
+    const { error } = await supabaseClient
+      .from("trip_plans")
+      .update({ status: "active", archived_at: null })
+      .eq("id", planId);
+    if (error) throw error;
+    if (currentPlanId === planId) setCurrentPlanMeta(planId, "active");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划已恢复到进行中。");
+  } catch (error) {
+    setAccountFeedback(`取消归档失败：${error.message}`, true);
+  }
+}
+
+async function deletePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再删除计划。", true);
+    return;
+  }
+  const targetPlan = myPlans.find((plan) => plan.id === planId);
+  const confirmed = window.confirm(`确定删除计划“${targetPlan?.title || "未命名旅行"}”吗？此操作不可恢复。`);
+  if (!confirmed) return;
+  try {
+    const { error } = await supabaseClient
+      .from("trip_plans")
+      .delete()
+      .eq("id", planId);
+    if (error) throw error;
+    if (currentPlanId === planId) setCurrentPlanMeta("", "");
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("计划已删除。");
+  } catch (error) {
+    setAccountFeedback(`删除失败：${error.message}`, true);
+  }
+}
+
+async function duplicatePlan(planId) {
+  if (!supabaseClient || !authSession?.user) {
+    setAccountFeedback("请先登录后再复制计划。", true);
+    return;
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from("trip_plans")
+      .select("title, start_date, end_date, travelers, snapshot")
+      .eq("id", planId)
+      .single();
+    if (error) throw error;
+    const copyPayload = {
+      owner_id: authSession.user.id,
+      title: `${data.title || "未命名旅行"} - 副本`,
+      status: "draft",
+      start_date: data.start_date,
+      end_date: data.end_date,
+      travelers: data.travelers || 1,
+      snapshot: data.snapshot || {}
+    };
+    const { error: insertError } = await supabaseClient
+      .from("trip_plans")
+      .insert(copyPayload);
+    if (insertError) throw insertError;
+    await loadMyPlans();
+    renderPlanList();
+    renderAuthPanels();
+    setAccountFeedback("已复制为一份新的旅行计划。");
+  } catch (error) {
+    setAccountFeedback(`复制失败：${error.message}`, true);
+  }
+}
+
+function createBlankPlan() {
+  state = createDefaultState();
+  selectedDayId = "";
+  setCurrentPlanMeta("", "");
+  saveState(false);
+  renderAll();
+  setActivePage(PAGES.planner);
+  setAccountFeedback("已创建一份新的本地空白计划。");
+}
+
+async function saveCurrentAsNewPlan() {
+  setCurrentPlanMeta("", "");
+  currentPlanStatus = "";
+  await savePlanToCloud();
+  await loadMyPlans();
+  renderPlanList();
+  renderAuthPanels();
+}
+
+async function savePlanToCloud() {
+  syncTripInputsToState();
+  saveState(false);
+  if (!supabaseClient || !authSession?.user) {
+    setCloudStatus("请先登录后再保存到云端。", true);
+    setActivePage(PAGES.home);
+    return;
+  }
+
+  els.saveCloudBtn.disabled = true;
+  setCloudStatus("正在保存到云端...");
+  const hasExistingCloudPlan = Boolean(currentPlanId && myPlans.some((plan) => plan.id === currentPlanId));
+  const draftPlanId = currentPlanId || (window.crypto?.randomUUID ? window.crypto.randomUUID() : uid("plan"));
+  const payload = {
+    plan_id: hasExistingCloudPlan ? currentPlanId : null,
+    title: state.trip.name?.trim() || "未命名旅行",
+    status: currentPlanStatus === "archived" ? "archived" : "active",
+    start_date: state.trip.startDate || null,
+    end_date: state.trip.endDate || null,
+    travelers: Math.max(1, Number(state.trip.travelers || 1)),
+    snapshot: state,
+    archived_at: currentPlanStatus === "archived" ? new Date().toISOString() : null,
+    new_plan_id: hasExistingCloudPlan ? null : draftPlanId
+  };
+
+  try {
+    const { data, error } = await supabaseClient.rpc("save_trip_plan", payload);
+    if (error) {
+      if (String(error.message || "").includes("save_trip_plan")) {
+        throw new Error("请先在 Supabase SQL Editor 执行 save_trip_plan 函数脚本");
+      }
+      throw error;
+    }
+    if (!data?.id) {
+      throw new Error("云端保存接口未返回计划记录");
+    }
+
+    await loadMyPlans();
+    setCurrentPlanMeta(data.id, data.status || payload.status);
+    renderPlanList();
+    renderAuthPanels();
+    setCloudStatus(`云端已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);
+    setAccountFeedback("旅行计划已同步到云端。");
+  } catch (error) {
+    setCloudStatus(`云端保存失败：${error.message}`, true);
+  } finally {
+    els.saveCloudBtn.disabled = false;
+  }
+}

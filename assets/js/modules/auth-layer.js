@@ -41,9 +41,47 @@ async function refreshAccountData() {
     return;
   }
   await Promise.all([loadProfile(), loadMyPlans()]);
+  await maybeMigrateGuestDraftToCloud();
   renderAuthPanels();
   renderPlanList();
   renderPlannerMeta();
+}
+
+async function maybeMigrateGuestDraftToCloud() {
+  if (!supabaseClient || !authSession?.user || !hasMeaningfulPlanState(state)) return false;
+  if (currentPlanId && myPlans.some((plan) => plan.id === currentPlanId)) return false;
+
+  const fingerprint = buildGuestDraftFingerprint(state);
+  if (!fingerprint || hasGuestDraftMigrationRecord(authSession.user.id, fingerprint)) return false;
+
+  const payload = {
+    plan_id: null,
+    title: state.trip.name?.trim() || "未命名旅行",
+    status: "active",
+    start_date: state.trip.startDate || null,
+    end_date: state.trip.endDate || null,
+    travelers: Math.max(1, Number(state.trip.travelers || 1)),
+    snapshot: state,
+    archived_at: null,
+    new_plan_id: window.crypto?.randomUUID ? window.crypto.randomUUID() : uid("plan")
+  };
+
+  try {
+    const { data, error } = await supabaseClient.rpc("save_trip_plan", payload);
+    if (error) throw error;
+    if (!data?.id) throw new Error("未收到有效的云端计划编号");
+
+    markGuestDraftMigrated(authSession.user.id, fingerprint);
+    await loadMyPlans();
+    setCurrentPlanMeta(data.id, data.status || payload.status);
+    saveState(false);
+    setAuthFeedback("登录成功，游客草稿已同步到云端");
+    setAccountFeedback("已将游客模式下的本地草稿同步到当前账号");
+    return true;
+  } catch (error) {
+    setAccountFeedback(`游客草稿同步失败：${error.message}`, true);
+    return false;
+  }
 }
 
 async function loadProfile() {
@@ -76,6 +114,7 @@ async function loadMyPlans() {
     return myPlans;
   }
   myPlans = data || [];
+  prunePlanLibraryMeta(authSession.user.id, myPlans.map((plan) => plan.id));
   return myPlans;
 }
 
@@ -171,6 +210,7 @@ async function loadPlanFromCloud(planId) {
     if (error) throw error;
     state = normalizeState(data.snapshot || {});
     selectedDayId = state.days[0]?.id || "";
+    markPlanOpened(data.id);
     setCurrentPlanMeta(data.id, data.status || "");
     saveState(false);
     renderAll();
@@ -339,6 +379,7 @@ async function savePlanToCloud() {
 
     await loadMyPlans();
     setCurrentPlanMeta(data.id, data.status || payload.status);
+    markPlanOpened(data.id);
     renderPlanList();
     renderAuthPanels();
     setCloudStatus(`云端已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);

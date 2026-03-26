@@ -2,6 +2,8 @@ var STORAGE_KEY = "travel_planner_v9";
 var PAGE_STORAGE_KEY = "gopace_active_page";
 var AUTH_VIEW_STORAGE_KEY = "gopace_auth_view";
 var CURRENT_PLAN_STORAGE_KEY = "gopace_current_plan_id";
+var GUEST_DRAFT_MIGRATION_STORAGE_KEY = "gopace_guest_draft_migration";
+var PLAN_LIBRARY_META_STORAGE_KEY = "gopace_plan_library_meta";
 
 var PLACE_TYPES = ["起点", "终点", "景点", "途径点", "饭店", "酒店", "交通枢纽", "购物", "休闲", "备用"];
 var TRANSPORT_MODES = [
@@ -371,6 +373,174 @@ function saveState(showStatus = true) {
   if (showStatus) {
     els.saveStatus.textContent = `已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
   }
+}
+
+function hasMeaningfulPlanState(planState = state) {
+  const snapshot = normalizeState(planState);
+  const hasTripName = Boolean(snapshot.trip?.name?.trim());
+  const hasPlaces = snapshot.places.some((place) => Boolean(place.name?.trim() || place.city?.trim() || place.address?.trim()));
+  const hasItems = snapshot.days.some((day) => Array.isArray(day.items) && day.items.length > 0);
+  return hasTripName || hasPlaces || hasItems;
+}
+
+function buildGuestDraftFingerprint(planState = state) {
+  const snapshot = normalizeState(planState);
+  if (!hasMeaningfulPlanState(snapshot)) return "";
+  return JSON.stringify({
+    trip: {
+      name: snapshot.trip?.name?.trim() || "",
+      travelers: Math.max(1, Number(snapshot.trip?.travelers || 1)),
+      startDate: snapshot.trip?.startDate || "",
+      endDate: snapshot.trip?.endDate || ""
+    },
+    places: snapshot.places.map((place) => ({
+      name: place.name || "",
+      city: place.city || "",
+      address: place.address || "",
+      lng: toNumberOrNull(place.lng),
+      lat: toNumberOrNull(place.lat)
+    })),
+    days: snapshot.days.map((day) => ({
+      title: day.title || "",
+      date: day.date || "",
+      items: Array.isArray(day.items) ? day.items.map((item) => ({
+        placeId: item.placeId || "",
+        type: item.type || "",
+        stayMinutes: Number(item.stayMinutes || 0),
+        startTime: item.startTime || "",
+        notes: item.notes || "",
+        transportFromPrev: item.transportFromPrev || "none"
+      })) : []
+    }))
+  });
+}
+
+function loadGuestDraftMigrationMap() {
+  try {
+    const raw = localStorage.getItem(GUEST_DRAFT_MIGRATION_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadStoredJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function persistStoredJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage write failures and keep the app usable.
+  }
+}
+
+function persistGuestDraftMigrationMap(migrationMap) {
+  try {
+    localStorage.setItem(GUEST_DRAFT_MIGRATION_STORAGE_KEY, JSON.stringify(migrationMap || {}));
+  } catch {
+    // Ignore storage write failures and keep the app usable.
+  }
+}
+
+function hasGuestDraftMigrationRecord(userId, fingerprint) {
+  if (!userId || !fingerprint) return false;
+  const migrationMap = loadGuestDraftMigrationMap();
+  return migrationMap[userId] === fingerprint;
+}
+
+function markGuestDraftMigrated(userId, fingerprint) {
+  if (!userId || !fingerprint) return;
+  const migrationMap = loadGuestDraftMigrationMap();
+  migrationMap[userId] = fingerprint;
+  persistGuestDraftMigrationMap(migrationMap);
+}
+
+function getPlanLibraryMetaStore() {
+  return loadStoredJson(PLAN_LIBRARY_META_STORAGE_KEY, {});
+}
+
+function getPlanLibraryMeta(userId) {
+  if (!userId) return { pinnedIds: [], recentIds: [] };
+  const store = getPlanLibraryMetaStore();
+  const scoped = store[userId];
+  return {
+    pinnedIds: Array.isArray(scoped?.pinnedIds) ? scoped.pinnedIds : [],
+    recentIds: Array.isArray(scoped?.recentIds) ? scoped.recentIds : []
+  };
+}
+
+function persistPlanLibraryMeta(userId, meta) {
+  if (!userId) return;
+  const store = getPlanLibraryMetaStore();
+  store[userId] = {
+    pinnedIds: Array.isArray(meta?.pinnedIds) ? meta.pinnedIds.slice(0, 20) : [],
+    recentIds: Array.isArray(meta?.recentIds) ? meta.recentIds.slice(0, 12) : []
+  };
+  persistStoredJson(PLAN_LIBRARY_META_STORAGE_KEY, store);
+}
+
+function prunePlanLibraryMeta(userId, validPlanIds) {
+  if (!userId) return;
+  const allowedIds = new Set(Array.isArray(validPlanIds) ? validPlanIds.filter(Boolean) : []);
+  const meta = getPlanLibraryMeta(userId);
+  persistPlanLibraryMeta(userId, {
+    pinnedIds: meta.pinnedIds.filter((id) => allowedIds.has(id)),
+    recentIds: meta.recentIds.filter((id) => allowedIds.has(id))
+  });
+}
+
+function togglePinnedPlan(planId) {
+  const userId = authSession?.user?.id;
+  if (!userId || !planId) return false;
+  const meta = getPlanLibraryMeta(userId);
+  const isPinned = meta.pinnedIds.includes(planId);
+  meta.pinnedIds = isPinned
+    ? meta.pinnedIds.filter((id) => id !== planId)
+    : [planId, ...meta.pinnedIds.filter((id) => id !== planId)];
+  persistPlanLibraryMeta(userId, meta);
+  return !isPinned;
+}
+
+function markPlanOpened(planId) {
+  const userId = authSession?.user?.id;
+  if (!userId || !planId) return;
+  const meta = getPlanLibraryMeta(userId);
+  meta.recentIds = [planId, ...meta.recentIds.filter((id) => id !== planId)];
+  persistPlanLibraryMeta(userId, meta);
+}
+
+function getRecentPlanRank(planId) {
+  const userId = authSession?.user?.id;
+  if (!userId || !planId) return -1;
+  return getPlanLibraryMeta(userId).recentIds.indexOf(planId);
+}
+
+function isPlanPinned(planId) {
+  const userId = authSession?.user?.id;
+  if (!userId || !planId) return false;
+  return getPlanLibraryMeta(userId).pinnedIds.includes(planId);
+}
+
+function getPlanCompletionState(plan) {
+  const snapshot = normalizeState(plan?.snapshot || {});
+  const summary = getPlanSnapshotSummary({ snapshot, start_date: plan?.start_date, end_date: plan?.end_date });
+  const hasDateRange = Boolean(plan?.start_date && plan?.end_date);
+  const hasTripName = Boolean(plan?.title?.trim());
+  const hasRoute = summary.itemCount >= 2 || (summary.placeCount >= 2 && summary.dayCount >= 1);
+  if (hasTripName && hasDateRange && hasRoute) {
+    return { label: "进行中", tone: "active" };
+  }
+  return { label: "待完善", tone: "draft" };
 }
 
 function hasSupabaseConfig() {

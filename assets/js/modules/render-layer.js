@@ -8,6 +8,15 @@ function getFilteredPlans() {
     plans = plans.filter((plan) => normalizePlanText(plan.title).includes(query));
   }
   plans.sort((a, b) => {
+    const pinDelta = Number(isPlanPinned(b.id)) - Number(isPlanPinned(a.id));
+    if (pinDelta) return pinDelta;
+    const recentA = getRecentPlanRank(a.id);
+    const recentB = getRecentPlanRank(b.id);
+    if (recentA !== recentB) {
+      if (recentA === -1) return 1;
+      if (recentB === -1) return -1;
+      return recentA - recentB;
+    }
     if (planSort === "updated_asc") return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
     if (planSort === "title_asc") return String(a.title || "").localeCompare(String(b.title || ""), "zh-CN");
     if (planSort === "title_desc") return String(b.title || "").localeCompare(String(a.title || ""), "zh-CN");
@@ -194,11 +203,26 @@ function renderHomeOverview() {
 function renderHomeRecentPlans() {
   if (!els.homeRecentPlans) return;
   els.homeRecentPlans.innerHTML = "";
-  const plans = [...myPlans].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 3);
+  const plans = [...myPlans]
+    .sort((a, b) => {
+      const recentA = getRecentPlanRank(a.id);
+      const recentB = getRecentPlanRank(b.id);
+      if (recentA !== recentB) {
+        if (recentA === -1) return 1;
+        if (recentB === -1) return -1;
+        return recentA - recentB;
+      }
+      const pinDelta = Number(isPlanPinned(b.id)) - Number(isPlanPinned(a.id));
+      if (pinDelta) return pinDelta;
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    })
+    .slice(0, 3);
   els.homeRecentPlansEmpty.hidden = plans.length > 0;
   if (!plans.length) return;
   plans.forEach((plan) => {
     const summary = getPlanSnapshotSummary(plan);
+    const recentRank = getRecentPlanRank(plan.id);
+    const isPinned = isPlanPinned(plan.id);
     const item = document.createElement("article");
     item.className = `mini-plan-item${currentPlanId === plan.id ? " is-current" : ""}`;
     item.innerHTML = `
@@ -206,12 +230,31 @@ function renderHomeRecentPlans() {
         <strong class="mini-plan-title">${escapeHtml(plan.title || "未命名旅行")}</strong>
         <span class="plan-status${plan.status === "archived" ? " archived" : ""}">${escapeHtml(currentPlanId === plan.id ? "当前绑定" : formatPlanStatus(plan.status))}</span>
       </div>
+      <div class="plan-card-flags"></div>
       <div class="plan-card-meta">
         <span>${escapeHtml(formatPlanDateRange(plan.start_date, plan.end_date))}</span>
         <span>${escapeHtml(`${summary.dayCount || 0} 天`)}</span>
         <span>${escapeHtml(`${summary.placeCount || 0} 个地点`)}</span>
       </div>
     `;
+    const flags = item.querySelector(".plan-card-flags");
+    if (recentRank === 0) {
+      const recentChip = document.createElement("span");
+      recentChip.className = "plan-flag tone-recent";
+      recentChip.textContent = "最近打开";
+      flags.append(recentChip);
+    } else if (recentRank > 0) {
+      const viewedChip = document.createElement("span");
+      viewedChip.className = "plan-flag tone-recent";
+      viewedChip.textContent = "近期查看";
+      flags.append(viewedChip);
+    }
+    if (isPinned) {
+      const pinChip = document.createElement("span");
+      pinChip.className = "plan-flag tone-pin";
+      pinChip.textContent = "已置顶";
+      flags.append(pinChip);
+    }
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ghost small";
@@ -241,9 +284,12 @@ function renderPlanList() {
   plans.forEach((plan) => {
     const summary = getPlanSnapshotSummary(plan);
     const metaList = buildPlanMetaList(plan);
+    const completion = getPlanCompletionState(plan);
     const isCurrent = currentPlanId === plan.id;
+    const isPinned = isPlanPinned(plan.id);
+    const recentRank = getRecentPlanRank(plan.id);
     const article = document.createElement("article");
-    article.className = `plan-card${plan.status === "archived" ? " archived" : ""}${isCurrent ? " current" : ""}`;
+    article.className = `plan-card${plan.status === "archived" ? " archived" : ""}${isCurrent ? " current" : ""}${isPinned ? " pinned" : ""}`;
     article.innerHTML = `
       <div class="plan-card-top">
         <div class="plan-main">
@@ -254,6 +300,7 @@ function renderPlanList() {
         </div>
         <span class="plan-status${plan.status === "archived" ? " archived" : ""}">${escapeHtml(isCurrent ? "当前绑定" : formatPlanStatus(plan.status))}</span>
       </div>
+      <div class="plan-card-flags"></div>
       <div class="plan-card-summary">
         <article class="plan-summary-chip">
           <span>行程天数</span>
@@ -275,6 +322,23 @@ function renderPlanList() {
       <p class="plan-card-notes">${escapeHtml(isCurrent ? "这条计划当前已经与功能页绑定，你可以直接继续编辑并再次保存到云端。" : "可以把这条计划重新载入到功能页继续编辑，也可以复制、归档或删除。")}</p>
       <div class="plan-actions"></div>
     `;
+    const flags = article.querySelector(".plan-card-flags");
+    const completionChip = document.createElement("span");
+    completionChip.className = `plan-flag tone-${completion.tone}`;
+    completionChip.textContent = completion.label;
+    flags.append(completionChip);
+    if (isPinned) {
+      const pinChip = document.createElement("span");
+      pinChip.className = "plan-flag tone-pin";
+      pinChip.textContent = "已置顶";
+      flags.append(pinChip);
+    }
+    if (recentRank > -1 && recentRank < 3) {
+      const recentChip = document.createElement("span");
+      recentChip.className = "plan-flag tone-recent";
+      recentChip.textContent = recentRank === 0 ? "最近打开" : "近期查看";
+      flags.append(recentChip);
+    }
     const actions = article.querySelector(".plan-actions");
     const openBtn = document.createElement("button");
     openBtn.type = "button";
@@ -288,6 +352,16 @@ function renderPlanList() {
     copyBtn.textContent = "复制为新计划";
     copyBtn.addEventListener("click", () => duplicatePlan(plan.id));
     actions.append(copyBtn);
+    const pinBtn = document.createElement("button");
+    pinBtn.type = "button";
+    pinBtn.className = "small ghost";
+    pinBtn.textContent = isPinned ? "取消置顶" : "置顶";
+    pinBtn.addEventListener("click", () => {
+      const pinned = togglePinnedPlan(plan.id);
+      renderPlanList();
+      setAccountFeedback(pinned ? "已置顶到行程库顶部。" : "已取消置顶。");
+    });
+    actions.append(pinBtn);
     if (plan.status !== "archived") {
       const archiveBtn = document.createElement("button");
       archiveBtn.type = "button";
@@ -435,6 +509,12 @@ function renderDays() {
   node.querySelector(".day-title").textContent = day.title || `Day ${dayIndex + 1}`;
   node.querySelector(".day-date").textContent = formatDate(day.date);
   node.querySelector(".day-stats").textContent = `停留 ${formatMinutes(stats.stayMinutes)} / 出行 ${formatMinutes(stats.travelMinutes)} / 里程 ${formatDistance(stats.distanceKm)}`;
+  if (stats.diagnostics?.length) {
+    const diagnostic = document.createElement("div");
+    diagnostic.className = `day-diagnostic tone-${stats.diagnostics[0].tone || "calm"}`;
+    diagnostic.innerHTML = `<strong>${escapeHtml(stats.diagnostics[0].label)}</strong><span>${escapeHtml(stats.diagnostics[0].message)}</span>`;
+    node.querySelector(".day-header").appendChild(diagnostic);
+  }
   dropZone.classList.toggle("empty", day.items.length === 0);
   attachDropZoneEvents(dropZone, day.id);
 
@@ -547,6 +627,17 @@ function renderRouteSummary() {
     card.className = `summary-card${day.id === els.mapDaySelect.value ? " day-focus" : ""}`;
     const stats = getDayStats(day);
     card.innerHTML = `<strong>${day.title} · ${formatDate(day.date)}</strong><div class="mini">停留 ${formatMinutes(stats.stayMinutes)} / 出行 ${formatMinutes(stats.travelMinutes)} / 里程 ${formatDistance(stats.distanceKm)}</div>`;
+    if (stats.diagnostics?.length) {
+      const diagnosticList = document.createElement("div");
+      diagnosticList.className = "diagnostic-list";
+      stats.diagnostics.forEach((entry) => {
+        const chip = document.createElement("div");
+        chip.className = `diagnostic-chip tone-${entry.tone || "calm"}`;
+        chip.innerHTML = `<strong>${escapeHtml(entry.label)}</strong><span>${escapeHtml(entry.message)}</span>`;
+        diagnosticList.appendChild(chip);
+      });
+      card.appendChild(diagnosticList);
+    }
     const list = document.createElement("div");
     list.className = "segment-list";
     day.items.forEach((item, index) => {

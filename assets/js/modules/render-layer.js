@@ -49,26 +49,34 @@ function renderPlanStats() {
   els.homeMetricPlans.textContent = String(allCount);
   els.homeMetricArchived.textContent = String(archivedCount);
   els.homeMetricCurrent.textContent = String(activeCount);
+  if (els.profileHubArchivedCount) {
+    els.profileHubArchivedCount.textContent = String(archivedCount);
+  }
 }
 
 function setActivePage(nextPage) {
   if (nextPage === PAGES.planner) {
     activePage = PAGES.planner;
-  } else if (nextPage === PAGES.library) {
-    activePage = PAGES.library;
+  } else if (nextPage === PAGES.placeLibrary) {
+    activePage = PAGES.placeLibrary;
+  } else if (nextPage === PAGES.profile) {
+    activePage = PAGES.profile;
   } else {
     activePage = PAGES.home;
   }
   persistStoredValue(PAGE_STORAGE_KEY, activePage);
   const isHome = activePage === PAGES.home;
-  const isLibrary = activePage === PAGES.library;
+  const isPlaceLibrary = activePage === PAGES.placeLibrary;
   const isPlanner = activePage === PAGES.planner;
+  const isProfile = activePage === PAGES.profile;
   els.homePage.hidden = !isHome;
-  els.libraryPage.hidden = !isLibrary;
+  els.placeLibraryPage.hidden = !isPlaceLibrary;
   els.plannerPage.hidden = !isPlanner;
+  els.profilePage.hidden = !isProfile;
   els.navHomeBtn.classList.toggle("active", isHome);
-  els.navLibraryBtn.classList.toggle("active", isLibrary);
+  els.navPlaceLibraryBtn.classList.toggle("active", isPlaceLibrary);
   els.navPlannerBtn.classList.toggle("active", isPlanner);
+  els.navProfileBtn.classList.toggle("active", isProfile);
   if (isPlanner) {
     renderAll();
     ensureMapReady().catch(() => renderMap());
@@ -128,7 +136,7 @@ function renderAuthPanels() {
     els.brandProfileStatus.classList.remove("archived");
     els.brandProfileEmail.textContent = configured ? "登录后可查看账号信息" : "请先完成 Supabase 配置";
     els.brandProfilePlanCount.textContent = "0";
-    els.brandOpenPlannerBtn.textContent = "进入功能页";
+    els.brandOpenPlannerBtn.textContent = "进入规划页";
     return;
   }
   const displayName = authProfile?.display_name || authSession.user.user_metadata?.display_name || authSession.user.email?.split("@")[0] || "旅行用户";
@@ -141,7 +149,7 @@ function renderAuthPanels() {
   els.brandProfileStatus.classList.remove("archived");
   els.brandProfileEmail.textContent = authSession.user.email || "-";
   els.brandProfilePlanCount.textContent = String(myPlans.length);
-  els.brandOpenPlannerBtn.textContent = "进入功能页";
+  els.brandOpenPlannerBtn.textContent = "进入规划页";
 }
 
 function renderHomeOverview() {
@@ -151,9 +159,9 @@ function renderHomeOverview() {
   const archivedCount = myPlans.filter((plan) => plan.status === "archived").length;
   if (!signedIn) {
     els.homeOverviewBadge.textContent = configured ? "访客模式" : "待配置";
-    els.homeOverviewText.textContent = configured
-      ? "登录后，首页会自动聚合当前计划、最近更新和旅行足迹，让这里成为你继续推进旅程的入口。"
-      : "先完成 Supabase 配置，随后即可启用注册登录、云端保存、行程库和足迹地图。";
+  els.homeOverviewText.textContent = configured
+      ? "登录后，首页会自动聚合当前计划、最近更新和旅行足迹，并把地点库、规划页、个人页串成完整入口。"
+      : "先完成 Supabase 配置，随后即可启用注册登录、云端保存、个人页和足迹地图。";
     if (els.homeSpotlightStatus) {
       els.homeSpotlightStatus.textContent = "未绑定";
       els.homeSpotlightStatus.classList.remove("archived");
@@ -169,20 +177,20 @@ function renderHomeOverview() {
   els.homeOverviewBadge.textContent = "云端已连接";
   els.homeOverviewText.textContent = currentPlan
     ? `你现在有 ${activeCount} 条进行中计划和 ${archivedCount} 条归档足迹，最适合先从「${currentPlan.title || "未命名旅行"}」继续推进。`
-    : `你现在有 ${activeCount} 条进行中计划和 ${archivedCount} 条归档足迹，可以从功能页开启新旅程，或去行程库挑一条继续编辑。`;
+    : `你现在有 ${activeCount} 条进行中计划和 ${archivedCount} 条归档足迹，可以从规划页开启新旅程，或去个人页挑一条继续编辑。`;
   if (currentPlan && els.homeSpotlightStatus) {
     const summary = getPlanSnapshotSummary(currentPlan);
     els.homeSpotlightStatus.textContent = currentPlan.status === "archived" ? "已归档" : "当前绑定";
     els.homeSpotlightStatus.classList.toggle("archived", currentPlan.status === "archived");
     els.homeSpotlightTitle.textContent = currentPlan.title || "未命名旅行";
     if (currentPlan.status === "archived") {
-      els.homeSpotlightText.textContent = "这条路线已经沉淀为足迹，你仍然可以重新打开、复制为新计划，或在行程库里恢复继续编辑。";
+      els.homeSpotlightText.textContent = "这条路线已经沉淀为足迹，你仍然可以重新打开、复制为新计划，或在个人页里恢复继续编辑。";
     } else if (summary.itemCount) {
       els.homeSpotlightText.textContent = `这条行程已经串起 ${summary.placeCount || 0} 个地点和 ${summary.itemCount} 个节点，继续补充交通和时间会更完整。`;
     } else if (summary.placeCount) {
       els.homeSpotlightText.textContent = `当前已经收集 ${summary.placeCount} 个地点，下一步可以把它们安排进每天的路线。`;
     } else {
-      els.homeSpotlightText.textContent = "当前计划已经绑定，但还没有加入地点；先去功能页挑几个想去的地方会更有推进感。";
+      els.homeSpotlightText.textContent = "当前计划已经绑定，但还没有加入地点；先去地点库收集几个想去的地方会更有推进感。";
     }
     els.homeSpotlightMeta.innerHTML = buildHomeSpotlightMeta(currentPlan, summary)
       .map((text) => `<span>${escapeHtml(text)}</span>`)
@@ -191,9 +199,9 @@ function renderHomeOverview() {
     els.homeSpotlightStatus.textContent = "未绑定";
     els.homeSpotlightStatus.classList.remove("archived");
     els.homeSpotlightTitle.textContent = "还没有当前计划";
-    els.homeSpotlightText.textContent = activeCount
-      ? "你已经有进行中的计划了，可以从行程库选一条载入到首页，作为当前推进中的旅程。"
-      : "可以去功能页新建一条计划，或者从行程库载入一条已有计划。";
+      els.homeSpotlightText.textContent = activeCount
+      ? "你已经有进行中的计划了，可以从个人页选一条载入，作为当前推进中的旅程。"
+      : "可以去规划页新建一条计划，或者从个人页载入一条已有计划。";
     els.homeSpotlightMeta.innerHTML = `<span>${activeCount} 条进行中</span><span>${archivedCount} 条已归档</span>`;
   }
   renderHomeRecentPlans();
@@ -273,8 +281,8 @@ function renderPlanList() {
   const hasPlans = Array.isArray(plans) && plans.length > 0;
   els.libraryPlanEmpty.hidden = hasPlans;
   els.libraryPlanEmpty.textContent = myPlans.length
-    ? "当前筛选条件下没有匹配的旅行计划。你可以切换状态、搜索关键词，或者从功能页继续保存新的计划。"
-    : "当前还没有任何旅行计划。你可以先去功能页规划，再保存到云端。";
+    ? "当前筛选条件下没有匹配的旅行计划。你可以切换状态、搜索关键词，或者从规划页继续保存新的计划。"
+    : "当前还没有任何旅行计划。你可以先去规划页规划，再保存到云端。";
   els.planManagerSummary.textContent = `当前显示 ${plans.length} 条计划，共 ${myPlans.length} 条`;
   if (!hasPlans) {
     renderHomeRecentPlans();
@@ -319,7 +327,7 @@ function renderPlanList() {
           <strong>${escapeHtml(isCurrent ? "编辑中" : formatPlanStatus(plan.status))}</strong>
         </article>
       </div>
-      <p class="plan-card-notes">${escapeHtml(isCurrent ? "这条计划当前已经与功能页绑定，你可以直接继续编辑并再次保存到云端。" : "可以把这条计划重新载入到功能页继续编辑，也可以复制、归档或删除。")}</p>
+      <p class="plan-card-notes">${escapeHtml(isCurrent ? "这条计划当前已经与规划页绑定，你可以直接继续编辑并再次保存到云端。" : "可以把这条计划重新载入到规划页继续编辑，也可以复制、归档或删除。")}</p>
       <div class="plan-actions"></div>
     `;
     const flags = article.querySelector(".plan-card-flags");
@@ -359,7 +367,7 @@ function renderPlanList() {
     pinBtn.addEventListener("click", () => {
       const pinned = togglePinnedPlan(plan.id);
       renderPlanList();
-      setAccountFeedback(pinned ? "已置顶到行程库顶部。" : "已取消置顶。");
+      setAccountFeedback(pinned ? "已置顶到个人页计划列表顶部。" : "已取消置顶。");
     });
     actions.append(pinBtn);
     if (plan.status !== "archived") {
@@ -406,14 +414,21 @@ function renderSuggestions() {
     row.addEventListener("mouseenter", () => {
       activeSuggestionIndex = index;
     });
-    row.addEventListener("click", () => {
+    row.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(".add-inline")) return;
+      event.preventDefault();
+      event.stopPropagation();
       activeSuggestionIndex = index;
-      els.searchKeyword.value = item.name || item.keyword || "";
+      addPlaceFromSuggestion(item);
+    });
+    row.querySelector(".add-inline").addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      addPlaceFromSuggestion(item);
     });
     row.querySelector(".add-inline").addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      addPlaceFromSuggestion(item);
     });
     els.suggestions.appendChild(row);
   });
@@ -421,12 +436,23 @@ function renderSuggestions() {
 
 function renderPlaces() {
   els.placePool.innerHTML = "";
-  els.placeCount.textContent = `${state.places.length} 个地点`;
-  state.places.forEach((place) => {
+  if (els.plannerPlaceCategorySelect) {
+    els.plannerPlaceCategorySelect.value = plannerPlaceFilter;
+  }
+  if (els.plannerPlaceSearchInput) {
+    els.plannerPlaceSearchInput.value = plannerPlaceSearchQuery;
+  }
+  const visiblePlaces = getFilteredPlannerPlaces();
+  els.placeCount.textContent = `${visiblePlaces.length} / ${state.places.length} 个地点`;
+  visiblePlaces.forEach((place) => {
     const node = els.placeCardTemplate.content.firstElementChild.cloneNode(true);
     node.dataset.placeId = place.id;
     node.querySelector(".place-name").textContent = place.name;
-    node.querySelector(".place-meta").textContent = [place.city || "", place.address || "无详细地址"].filter(Boolean).join(" · ");
+    node.querySelector(".place-meta").textContent = [
+      getPlaceCategoryLabel(place.category),
+      getResolvedPlaceProvince(place),
+      place.address || "无详细地址"
+    ].filter(Boolean).join(" · ");
     node.querySelector(".delete-place").addEventListener("click", () => removePlace(place.id));
     node.addEventListener("dragstart", () => {
       dragState = { type: "place", placeId: place.id };
@@ -439,6 +465,195 @@ function renderPlaces() {
     });
     els.placePool.appendChild(node);
   });
+  if (!visiblePlaces.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = state.places.length ? "当前筛选条件下没有地点，换个关键词或分类试试。" : "地点库还是空的，先去地点库添加几个地点。";
+    els.placePool.appendChild(empty);
+  }
+}
+
+function getPlaceCategoryLabel(category) {
+  return PLACE_LIBRARY_CATEGORIES.find((item) => item.value === category)?.label || "其他";
+}
+
+function getResolvedPlaceProvince(place) {
+  if (place?.province?.trim()) return place.province.trim();
+  const source = `${place?.city || ""} ${place?.district || ""} ${place?.address || ""}`;
+  const provinceEntries = [
+    ["北京市", ["北京"]],
+    ["天津市", ["天津"]],
+    ["上海市", ["上海"]],
+    ["重庆市", ["重庆"]],
+    ["河北省", ["河北"]],
+    ["山西省", ["山西"]],
+    ["辽宁省", ["辽宁"]],
+    ["吉林省", ["吉林"]],
+    ["黑龙江省", ["黑龙江"]],
+    ["江苏省", ["江苏"]],
+    ["浙江省", ["浙江"]],
+    ["安徽省", ["安徽"]],
+    ["福建省", ["福建"]],
+    ["江西省", ["江西"]],
+    ["山东省", ["山东"]],
+    ["河南省", ["河南"]],
+    ["湖北省", ["湖北"]],
+    ["湖南省", ["湖南"]],
+    ["广东省", ["广东"]],
+    ["海南省", ["海南"]],
+    ["四川省", ["四川"]],
+    ["贵州省", ["贵州"]],
+    ["云南省", ["云南"]],
+    ["陕西省", ["陕西", "陕"]],
+    ["甘肃省", ["甘肃"]],
+    ["青海省", ["青海"]],
+    ["台湾省", ["台湾"]],
+    ["内蒙古自治区", ["内蒙古"]],
+    ["广西壮族自治区", ["广西"]],
+    ["西藏自治区", ["西藏"]],
+    ["宁夏回族自治区", ["宁夏"]],
+    ["新疆维吾尔自治区", ["新疆"]],
+    ["香港特别行政区", ["香港"]],
+    ["澳门特别行政区", ["澳门"]]
+  ];
+  const hit = provinceEntries.find(([, aliases]) => aliases.some((alias) => source.includes(alias)));
+  return hit?.[0] || place?.city || "";
+}
+
+function matchPlaceKeyword(place, keyword) {
+  const normalized = normalizePlanText(keyword || "");
+  if (!normalized) return true;
+  return normalizePlanText([
+    place.name || "",
+    getResolvedPlaceProvince(place),
+    place.city || "",
+    place.district || "",
+    place.address || ""
+  ].join(" ")).includes(normalized);
+}
+
+function getFilteredPlaceLibraryPlaces() {
+  return state.places.filter((place) => {
+    const matchCategory = placeLibraryFilter === "all" || place.category === placeLibraryFilter;
+    return matchCategory && matchPlaceKeyword(place, placeLibrarySearchQuery);
+  });
+}
+
+function getFilteredPlannerPlaces() {
+  return state.places.filter((place) => {
+    const matchCategory = plannerPlaceFilter === "all" || place.category === plannerPlaceFilter;
+    return matchCategory && matchPlaceKeyword(place, plannerPlaceSearchQuery);
+  });
+}
+
+function renderPlaceLibraryFilters() {
+  [
+    [els.placeFilterAllBtn, "all"],
+    [els.placeFilterPlayBtn, "play"],
+    [els.placeFilterFoodBtn, "food"],
+    [els.placeFilterStayBtn, "stay"],
+    [els.placeFilterOtherBtn, "other"]
+  ].forEach(([button, value]) => {
+    button.classList.toggle("active", placeLibraryFilter === value);
+  });
+  if (els.placeLibrarySearchInput) {
+    els.placeLibrarySearchInput.value = placeLibrarySearchQuery;
+  }
+}
+
+function renderPlaceLibraryStats() {
+  const playCount = state.places.filter((place) => place.category === "play").length;
+  const foodCount = state.places.filter((place) => place.category === "food").length;
+  const stayCount = state.places.filter((place) => place.category === "stay").length;
+  els.placeLibraryStatAll.textContent = String(state.places.length);
+  els.placeLibraryStatPlay.textContent = String(playCount);
+  els.placeLibraryStatFood.textContent = String(foodCount);
+  els.placeLibraryStatStay.textContent = String(stayCount);
+  els.placeLibraryCount.textContent = `${state.places.length} 个地点`;
+  if (els.profileHubPlaceCount) {
+    els.profileHubPlaceCount.textContent = String(state.places.length);
+  }
+}
+
+function renderPlaceLibraryList() {
+  els.placeLibraryList.innerHTML = "";
+  renderPlaceLibraryFilters();
+  renderPlaceLibraryStats();
+  const places = getFilteredPlaceLibraryPlaces();
+  els.placeLibraryEmpty.hidden = places.length > 0;
+  els.placeLibrarySummary.textContent = placeLibraryNotice
+    ? `当前显示 ${places.length} 个地点，共 ${state.places.length} 个 · ${placeLibraryNotice}`
+    : `当前显示 ${places.length} 个地点，共 ${state.places.length} 个`;
+  if (!places.length) return;
+  places.forEach((place) => {
+    const article = document.createElement("article");
+    article.className = `place-library-item tone-${place.category || "other"}`;
+    article.innerHTML = `
+      <div class="place-library-item-top">
+        <div class="place-library-title-block">
+          <div class="place-library-headline">
+            <h3>${escapeHtml(place.name || "未命名地点")}</h3>
+            <span class="place-library-type-pill">${escapeHtml(getPlaceCategoryLabel(place.category))}</span>
+          </div>
+          <p class="mini">${escapeHtml([getResolvedPlaceProvince(place), place.city || "", place.district || "", place.address || "无详细地址"].filter(Boolean).join(" · "))}</p>
+        </div>
+        <button type="button" class="place-library-delete" aria-label="删除地点" title="删除地点">×</button>
+      </div>
+      <div class="place-library-fields">
+        <div class="place-library-field-group">
+          <span class="place-library-field-label">调整分类</span>
+          <select class="place-library-category chip-select">
+            ${PLACE_LIBRARY_CATEGORIES.filter((item) => item.value !== "all").map((item) => `<option value="${item.value}">${item.label}</option>`).join("")}
+          </select>
+        </div>
+        <div class="place-library-field-group">
+          <span class="place-library-field-label">省份自动识别</span>
+          <div class="place-library-meta-chip">
+            <strong>${escapeHtml(getResolvedPlaceProvince(place) || "识别中")}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+    article.querySelector(".place-library-category").value = place.category || "other";
+    article.querySelector(".place-library-category").addEventListener("change", (event) => {
+      updatePlaceLibraryEntry(place.id, { category: event.target.value });
+    });
+    article.querySelector(".place-library-delete").addEventListener("click", () => removePlace(place.id));
+    els.placeLibraryList.appendChild(article);
+  });
+  schedulePlaceLibraryMasonry();
+}
+
+function layoutPlaceLibraryMasonry() {
+  if (!els.placeLibraryList || !els.placeLibraryList.children.length) return;
+  const styles = window.getComputedStyle(els.placeLibraryList);
+  const rowSize = Number.parseFloat(styles.gridAutoRows);
+  const rowGap = Number.parseFloat(styles.rowGap || styles.gap);
+  if (!rowSize || Number.isNaN(rowSize)) return;
+  [...els.placeLibraryList.children].forEach((item) => {
+    item.style.setProperty("--place-card-span", "1");
+    const contentHeight = item.scrollHeight;
+    const span = Math.max(1, Math.ceil((contentHeight + rowGap) / (rowSize + rowGap)));
+    item.style.setProperty("--place-card-span", String(span));
+  });
+}
+
+function schedulePlaceLibraryMasonry() {
+  if (!els.placeLibraryList) return;
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      layoutPlaceLibraryMasonry();
+    });
+  });
+}
+
+function renderProfileHub() {
+  const signedIn = Boolean(authSession?.user);
+  const displayName = authProfile?.display_name || authSession?.user?.user_metadata?.display_name || authSession?.user?.email?.split("@")[0] || "-";
+  els.profileHubAuthBadge.textContent = signedIn ? "已登录" : "未登录";
+  els.profileHubName.textContent = signedIn ? displayName : "-";
+  els.profileHubEmail.textContent = signedIn ? (authSession?.user?.email || "-") : "-";
+  els.profileHubPlaceCount.textContent = String(state.places.length);
 }
 
 function buildPlaceTypeOptions(select, value) {
@@ -664,9 +879,11 @@ function renderRouteSummary() {
 function renderAll() {
   syncStateToTripInputs();
   renderAuthPanels();
+  renderProfileHub();
   renderPlanList();
   renderPlannerMeta();
   renderPlaces();
+  renderPlaceLibraryList();
   renderDays();
   if (activePage === PAGES.planner) renderMap();
   saveState(false);

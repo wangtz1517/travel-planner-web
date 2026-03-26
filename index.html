@@ -30,7 +30,7 @@
             <strong id="brandProfilePlanCount">0</strong>
           </div>
           <div class="brand-popover-actions" hidden>
-            <button id="brandOpenPlannerBtn" type="button" class="small">进入功能页</button>
+            <button id="brandOpenPlannerBtn" type="button" class="small">进入规划页</button>
             <button id="brandLogoutBtn" type="button" class="small ghost">退出登录</button>
           </div>
         </div>
@@ -38,8 +38,9 @@
         <div class="nav-meta">
           <nav class="nav-tabs" aria-label="主菜单">
             <button id="navHomeBtn" type="button" class="nav-tab active">首页</button>
-            <button id="navLibraryBtn" type="button" class="nav-tab">行程库</button>
-            <button id="navPlannerBtn" type="button" class="nav-tab">功能页</button>
+            <button id="navPlaceLibraryBtn" type="button" class="nav-tab">地点库</button>
+            <button id="navPlannerBtn" type="button" class="nav-tab">规划页</button>
+            <button id="navProfileBtn" type="button" class="nav-tab">个人信息</button>
           </nav>
           <button id="authBadge" type="button" class="status-badge auth-badge-button" disabled>游客模式</button>
         </div>
@@ -80,7 +81,7 @@
             </form>
 
             <div class="guest-entry">
-              <p class="panel-note">不登录也可以先进入功能页体验路线规划和本地保存，云端保存与行程库仍需登录后使用。</p>
+              <p class="panel-note">不登录也可以先进入地点库和规划页体验收藏、路线规划与本地保存，云端保存与个人页仍需登录后使用。</p>
               <button id="enterGuestModeBtn" type="button" class="ghost">游客体验</button>
             </div>
 
@@ -107,7 +108,7 @@
               </div>
             </div>
             <div class="profile-actions">
-              <button id="goPlannerBtn" type="button">进入功能页</button>
+              <button id="goPlannerBtn" type="button">进入规划页</button>
               <button id="logoutBtn" type="button" class="ghost">退出登录</button>
             </div>
             <p id="accountFeedback" class="panel-note"></p>
@@ -124,10 +125,10 @@
           </div>
           <div class="home-overview-shell">
             <div class="overview-intro-row">
-              <p id="homeOverviewText" class="panel-note overview-intro">在这里管理账号、进入规划功能，并通过行程库统一查看、归档和编辑你的旅行计划。</p>
+              <p id="homeOverviewText" class="panel-note overview-intro">在这里管理账号、进入地点库和规划页，并在个人信息页统一查看、归档和编辑你的旅行计划。</p>
               <div class="overview-actions">
-                <button id="homeOpenPlannerBtn" type="button">进入功能页</button>
-                <button id="homeOpenLibraryBtn" type="button" class="ghost">打开行程库</button>
+                <button id="homeOpenPlannerBtn" type="button">进入规划页</button>
+                <button id="homeOpenProfileBtn" type="button" class="ghost">打开个人页</button>
               </div>
             </div>
             <article id="homePlanSpotlight" class="overview-spotlight">
@@ -224,12 +225,88 @@
       </div>
     </section>
 
-    <section id="libraryPage" class="page-section library-page" hidden>
+    <section id="placeLibraryPage" class="page-section library-page" hidden>
+      <section class="card home-card library-card place-library-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Place Library</p>
+            <h2>地点库</h2>
+          </div>
+          <div class="plan-toolbar-actions">
+            <button id="placeLibraryOpenPlannerBtn" type="button" class="small">进入规划页</button>
+            <button id="placeLibraryOpenProfileBtn" type="button" class="ghost small">查看个人页</button>
+          </div>
+        </div>
+        <p class="panel-note">先把平时看到、听到、想去的地点沉淀到这里，再在规划页中直接调用。当前保留按玩、吃、住等分类整理，地点所属省份会结合地址信息自动识别。</p>
+
+        <div class="place-library-stats">
+          <article class="plan-stat-card">
+            <span>全部地点</span>
+            <strong id="placeLibraryStatAll">0</strong>
+          </article>
+          <article class="plan-stat-card">
+            <span>游玩</span>
+            <strong id="placeLibraryStatPlay">0</strong>
+          </article>
+          <article class="plan-stat-card">
+            <span>吃喝</span>
+            <strong id="placeLibraryStatFood">0</strong>
+          </article>
+          <article class="plan-stat-card">
+            <span>住宿</span>
+            <strong id="placeLibraryStatStay">0</strong>
+          </article>
+        </div>
+
+        <div class="place-library-shell">
+          <section class="place-library-search card">
+            <div class="sub-head">
+              <div>
+                <h3>添加地点</h3>
+                <p class="muted">搜索后直接加入你的个人地点库</p>
+              </div>
+              <span id="placeLibraryCount" class="muted">0 个地点</span>
+            </div>
+            <div class="search-box" autocomplete="off">
+              <label class="search-input-wrap">
+                <span>搜索地点 / 地址</span>
+                <input id="searchKeyword" type="text" placeholder="例如：北京烤鸭、故宫、三里屯酒店">
+                <div id="suggestions" class="suggestions"></div>
+              </label>
+            </div>
+            <p class="panel-note">加入后可继续补充分类。省份会结合已有地址信息自动识别，用于后续浏览和规划调用。</p>
+          </section>
+
+          <section class="place-library-main">
+            <div class="place-library-filter-bar">
+              <label class="plan-search-field place-library-keyword-field">
+                <span>关键词</span>
+                <input id="placeLibrarySearchInput" type="search" placeholder="按地点名称、城市或地址搜索">
+              </label>
+              <div class="plan-filter-tabs" aria-label="地点分类筛选">
+                <button id="placeFilterAllBtn" type="button" class="plan-filter active">全部</button>
+                <button id="placeFilterPlayBtn" type="button" class="plan-filter">玩</button>
+                <button id="placeFilterFoodBtn" type="button" class="plan-filter">吃</button>
+                <button id="placeFilterStayBtn" type="button" class="plan-filter">住</button>
+                <button id="placeFilterOtherBtn" type="button" class="plan-filter">其他</button>
+              </div>
+            </div>
+            <div class="plan-manager-summary">
+              <span id="placeLibrarySummary" class="muted">当前显示 0 个地点</span>
+            </div>
+            <div id="placeLibraryList" class="place-library-list"></div>
+            <div id="placeLibraryEmpty" class="empty-block">地点库还是空的。先搜索几个你想去、想吃、想住的地方，后续规划时就能直接调用。</div>
+          </section>
+        </div>
+      </section>
+    </section>
+
+    <section id="profilePage" class="page-section library-page" hidden>
       <section class="card home-card plans-card library-card">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Library</p>
-            <h2>行程库</h2>
+            <p class="eyebrow">Profile</p>
+            <h2>个人信息页</h2>
           </div>
           <div class="plan-toolbar-actions">
             <button id="createBlankPlanBtn" type="button" class="small">新建空白计划</button>
@@ -237,7 +314,60 @@
             <button id="refreshPlansBtn" type="button" class="ghost small">刷新</button>
           </div>
         </div>
-        <p class="panel-note">这里作为完整的计划管理页使用。你可以查看全部计划、筛选状态、搜索名称，并从这里继续编辑、归档或删除。</p>
+        <p class="panel-note">这里作为你的个人中心使用。当前先聚合账号信息、地点库概况和完整行程管理，后续会继续扩展好友、社交和更多“我的”能力。</p>
+
+        <div class="profile-hub-grid">
+          <section class="profile-hub-card">
+            <div class="sub-head">
+              <div>
+                <h3>账号概况</h3>
+                <p class="muted">作为后续好友和社交能力的入口</p>
+              </div>
+              <span id="profileHubAuthBadge" class="status-badge">未登录</span>
+            </div>
+            <div class="profile-grid compact-profile-grid">
+              <div class="profile-field">
+                <span>昵称</span>
+                <strong id="profileHubName">-</strong>
+              </div>
+              <div class="profile-field">
+                <span>邮箱</span>
+                <strong id="profileHubEmail">-</strong>
+              </div>
+              <div class="profile-field">
+                <span>地点收藏</span>
+                <strong id="profileHubPlaceCount">0</strong>
+              </div>
+              <div class="profile-field">
+                <span>已归档足迹</span>
+                <strong id="profileHubArchivedCount">0</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="profile-hub-card">
+            <div class="sub-head">
+              <div>
+                <h3>后续开发方向</h3>
+                <p class="muted">保留“我的”页面的功能扩展位</p>
+              </div>
+            </div>
+            <div class="profile-feature-list">
+              <article class="overview-metric-card">
+                <span>好友系统</span>
+                <strong>待开发</strong>
+              </article>
+              <article class="overview-metric-card">
+                <span>共同收藏</span>
+                <strong>待开发</strong>
+              </article>
+              <article class="overview-metric-card">
+                <span>个人偏好</span>
+                <strong>待开发</strong>
+              </article>
+            </div>
+          </section>
+        </div>
 
         <div class="plan-stats-grid">
           <article class="plan-stat-card">
@@ -286,7 +416,7 @@
         </div>
 
         <div id="libraryPlanList" class="plan-list"></div>
-        <div id="libraryPlanEmpty" class="empty-block">当前还没有符合条件的旅行计划。你可以先去功能页规划，再保存到云端。</div>
+        <div id="libraryPlanEmpty" class="empty-block">当前还没有符合条件的旅行计划。你可以先去规划页规划，再保存到云端。</div>
       </section>
     </section>
 
@@ -294,7 +424,7 @@
       <header class="topbar card">
         <div class="title-block">
           <p class="eyebrow">Trip Workspace</p>
-          <h2>规划功能页</h2>
+          <h2>规划页</h2>
           <p id="currentPlanLabel" class="planner-caption">当前云端计划：未绑定</p>
         </div>
         <section class="trip-inline">
@@ -307,7 +437,8 @@
           <button id="generateDaysBtn" type="button">生成天数</button>
           <button id="saveBtn" type="button" class="ghost">保存到本地</button>
           <button id="saveCloudBtn" type="button">保存到云端</button>
-          <button id="openLibraryBtn" type="button" class="ghost">行程库</button>
+          <button id="openPlaceLibraryBtn" type="button" class="ghost">地点库</button>
+          <button id="openProfileBtn" type="button" class="ghost">个人页</button>
           <button id="exportBtn" type="button" class="ghost">导出 PDF</button>
           <button id="resetBtn" type="button" class="ghost">清空</button>
         </div>
@@ -316,14 +447,30 @@
       <main class="workspace">
         <section class="card pane left-pane">
           <div class="section-head">
-            <h2>候选地点库</h2>
+            <div>
+              <h2>规划页候选地点</h2>
+              <p class="muted">这里直接显示地点库中已收藏的地点</p>
+            </div>
             <span id="saveStatus" class="status">本地未保存</span>
           </div>
-          <div class="search-box" autocomplete="off">
-            <label class="search-input-wrap">
-              <span>搜索地点 / 地址</span>
-              <input id="searchKeyword" type="text" placeholder="例如：拙政园、上海虹桥站、外滩">
-              <div id="suggestions" class="suggestions"></div>
+          <div class="planner-library-entry">
+            <p class="panel-note">需要新增或整理地点时，先去独立地点库维护分类，再回到这里拖入行程。</p>
+            <button id="plannerOpenPlaceLibraryBtn" type="button" class="ghost small">打开地点库</button>
+          </div>
+          <div class="planner-place-filters">
+            <label class="plan-search-field">
+              <span>快速搜索</span>
+              <input id="plannerPlaceSearchInput" type="search" placeholder="例如：北京、酒店、烤鸭">
+            </label>
+            <label>
+              <span>分类</span>
+              <select id="plannerPlaceCategorySelect">
+                <option value="all">全部分类</option>
+                <option value="play">玩</option>
+                <option value="food">吃</option>
+                <option value="stay">住</option>
+                <option value="other">其他</option>
+              </select>
             </label>
           </div>
           <div class="sub-head">
@@ -457,13 +604,13 @@
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/modules/state-layer.js?v=20260325-1"></script>
-  <script src="assets/js/modules/planner-layer.js?v=20260325-1"></script>
+  <script src="assets/js/modules/state-layer.js?v=20260326-1"></script>
+  <script src="assets/js/modules/planner-layer.js?v=20260326-1"></script>
   <script src="assets/js/modules/map-layer.js?v=20260325-1"></script>
   <script src="assets/js/modules/footprint-layer.js?v=20260325-1"></script>
-  <script src="assets/js/modules/render-layer.js?v=20260325-1"></script>
+  <script src="assets/js/modules/render-layer.js?v=20260326-1"></script>
   <script src="assets/js/modules/auth-layer.js?v=20260325-1"></script>
-  <script src="assets/js/app.js?v=20260325-1"></script>
+  <script src="assets/js/app.js?v=20260326-1"></script>
 </body>
 </html>
 

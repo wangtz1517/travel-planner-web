@@ -7,24 +7,66 @@ renderAuthPanels = function wrappedRenderAuthPanels() {
   els.authBadge.textContent = signedIn ? "退出登录" : "游客模式";
   els.authBadge.disabled = !signedIn;
   els.authBadge.classList.toggle("is-actionable", signedIn);
-  els.authBadge.title = signedIn ? "点击退出当前账号" : "当前未登录";
+  els.authBadge.title = signedIn ? "点击退出当前账号" : "当前正在游客模式";
   if (!signedIn && hasSupabaseConfig()) {
-    els.homeOverviewText.textContent = "现在可以直接以游客模式进入功能页体验路线规划和本地保存；如果需要云端保存、同步和行程库管理，再登录账号即可。";
+    els.homeOverviewText.textContent = "游客模式下可以先整理地点库、体验规划和本地保存；登录后可自动同步草稿到云端，并解锁个人页、归档和跨设备管理。";
   }
 };
 
 function handleGuestAccess() {
-  setAuthFeedback("当前为游客模式。你可以直接体验规划功能并保存到本地，云端保存与行程库功能需要登录后使用。");
+  setAuthFeedback("已进入游客模式。你可以先做路线规划并保存在本机，登录后会自动把当前草稿同步到云端。");
   setAccountFeedback("");
-  setActivePage(PAGES.planner);
+  setActivePage(PAGES.placeLibrary);
+}
+
+function guideGuestToLogin(featureName) {
+  setAuthView(AUTH_VIEWS.login);
+  setActivePage(PAGES.home);
+  setAuthFeedback(`游客模式下可先体验路线规划和本地保存，${featureName}需要登录后使用；登录后会自动同步当前草稿。`);
+  setAccountFeedback(`要使用${featureName}，请先登录账号。`);
+}
+
+function openProfileOrPromptLogin() {
+  if (!authSession?.user) {
+    guideGuestToLogin("个人信息页");
+    return;
+  }
+  setActivePage(PAGES.profile);
 }
 
 function bindEvents() {
   els.navHomeBtn.addEventListener("click", () => setActivePage(PAGES.home));
-  els.navLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.navPlaceLibraryBtn.addEventListener("click", () => setActivePage(PAGES.placeLibrary));
   els.navPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.navProfileBtn.addEventListener("click", openProfileOrPromptLogin);
   els.authBadge.addEventListener("click", () => {
     if (authSession?.user) handleLogout();
+  });
+  els.placeLibraryOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
+  els.placeLibraryOpenProfileBtn.addEventListener("click", openProfileOrPromptLogin);
+  els.placeFilterAllBtn.addEventListener("click", () => {
+    placeLibraryFilter = "all";
+    renderPlaceLibraryList();
+  });
+  els.placeFilterPlayBtn.addEventListener("click", () => {
+    placeLibraryFilter = "play";
+    renderPlaceLibraryList();
+  });
+  els.placeFilterFoodBtn.addEventListener("click", () => {
+    placeLibraryFilter = "food";
+    renderPlaceLibraryList();
+  });
+  els.placeFilterStayBtn.addEventListener("click", () => {
+    placeLibraryFilter = "stay";
+    renderPlaceLibraryList();
+  });
+  els.placeFilterOtherBtn.addEventListener("click", () => {
+    placeLibraryFilter = "other";
+    renderPlaceLibraryList();
+  });
+  els.placeLibrarySearchInput.addEventListener("input", () => {
+    placeLibrarySearchQuery = els.placeLibrarySearchInput.value.trim();
+    renderPlaceLibraryList();
   });
   els.showRegisterBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.register));
   els.showLoginBtn.addEventListener("click", () => setAuthView(AUTH_VIEWS.login));
@@ -35,7 +77,7 @@ function bindEvents() {
   els.createBlankPlanBtn.addEventListener("click", createBlankPlan);
   els.saveCurrentAsNewBtn.addEventListener("click", () => {
     if (!authSession?.user) {
-      setAccountFeedback("请先登录后再保存新的云端计划。", true);
+      guideGuestToLogin("云端另存为新计划");
       return;
     }
     saveCurrentAsNewPlan().catch((error) => {
@@ -68,7 +110,7 @@ function bindEvents() {
   });
   els.refreshPlansBtn.addEventListener("click", async () => {
     if (!authSession?.user) {
-      setAccountFeedback("请先登录后再刷新云端计划。", true);
+      guideGuestToLogin("云端计划刷新");
       return;
     }
     setAccountFeedback("正在刷新云端计划...");
@@ -79,9 +121,19 @@ function bindEvents() {
   });
   els.goPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
   els.homeOpenPlannerBtn.addEventListener("click", () => setActivePage(PAGES.planner));
-  els.homeOpenLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
-  els.homeMiniLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
-  els.openLibraryBtn.addEventListener("click", () => setActivePage(PAGES.library));
+  els.homeOpenProfileBtn.addEventListener("click", openProfileOrPromptLogin);
+  els.homeMiniLibraryBtn.addEventListener("click", openProfileOrPromptLogin);
+  els.openPlaceLibraryBtn.addEventListener("click", () => setActivePage(PAGES.placeLibrary));
+  els.openProfileBtn.addEventListener("click", openProfileOrPromptLogin);
+  els.plannerOpenPlaceLibraryBtn.addEventListener("click", () => setActivePage(PAGES.placeLibrary));
+  els.plannerPlaceSearchInput.addEventListener("input", () => {
+    plannerPlaceSearchQuery = els.plannerPlaceSearchInput.value.trim();
+    renderPlaces();
+  });
+  els.plannerPlaceCategorySelect.addEventListener("change", () => {
+    plannerPlaceFilter = els.plannerPlaceCategorySelect.value;
+    renderPlaces();
+  });
   [els.tripName, els.travelerCount, els.startDate, els.endDate].forEach((input) => {
     input.addEventListener("change", () => {
       syncTripInputsToState();
@@ -94,7 +146,7 @@ function bindEvents() {
   els.saveCloudBtn.addEventListener("click", savePlanToCloud);
   els.exportBtn.addEventListener("click", () => window.print());
   els.resetBtn.addEventListener("click", () => {
-    if (!window.confirm("确认要清空当前功能页中的规划内容吗？")) return;
+    if (!window.confirm("确认要清空当前规划页中的内容吗？")) return;
     state = createDefaultState();
     selectedDayId = "";
     setCurrentPlanMeta("", "");
@@ -128,6 +180,9 @@ function bindEvents() {
   });
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".search-input-wrap")) clearSuggestions();
+  });
+  window.addEventListener("resize", () => {
+    schedulePlaceLibraryMasonry();
   });
 }
 

@@ -6,6 +6,13 @@ var GUEST_DRAFT_MIGRATION_STORAGE_KEY = "gopace_guest_draft_migration";
 var PLAN_LIBRARY_META_STORAGE_KEY = "gopace_plan_library_meta";
 
 var PLACE_TYPES = ["起点", "终点", "景点", "途径点", "饭店", "酒店", "交通枢纽", "购物", "休闲", "备用"];
+var PLACE_LIBRARY_CATEGORIES = [
+  { value: "all", label: "全部" },
+  { value: "play", label: "玩" },
+  { value: "food", label: "吃" },
+  { value: "stay", label: "住" },
+  { value: "other", label: "其他" }
+];
 var TRANSPORT_MODES = [
   { value: "none", label: "无 / 同地点", color: "#8a8f98", speed: 0 },
   { value: "walk", label: "步行", color: "#2f7f6d", speed: 5 },
@@ -21,7 +28,7 @@ var TRANSPORT_MODES = [
 var STAY_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
 var ROUTE_SERVICE_MODES = new Set(["walk", "taxi", "drive", "transit", "bike"]);
 var SUGGESTION_LIMIT = 10;
-var PAGES = { home: "home", library: "library", planner: "planner" };
+var PAGES = { home: "home", placeLibrary: "placeLibrary", planner: "planner", profile: "profile" };
 var AUTH_VIEWS = { register: "register", login: "login" };
 
 var els = {
@@ -36,13 +43,15 @@ var els = {
   brandOpenPlannerBtn: document.getElementById("brandOpenPlannerBtn"),
   brandLogoutBtn: document.getElementById("brandLogoutBtn"),
   navHomeBtn: document.getElementById("navHomeBtn"),
-  navLibraryBtn: document.getElementById("navLibraryBtn"),
+  navPlaceLibraryBtn: document.getElementById("navPlaceLibraryBtn"),
   navPlannerBtn: document.getElementById("navPlannerBtn"),
+  navProfileBtn: document.getElementById("navProfileBtn"),
   authBadge: document.getElementById("authBadge"),
   homeAuthBadge: document.getElementById("homeAuthBadge"),
   homePage: document.getElementById("homePage"),
-  libraryPage: document.getElementById("libraryPage"),
+  placeLibraryPage: document.getElementById("placeLibraryPage"),
   plannerPage: document.getElementById("plannerPage"),
+  profilePage: document.getElementById("profilePage"),
   supabaseConfigNotice: document.getElementById("supabaseConfigNotice"),
   authGuestPanel: document.getElementById("authGuestPanel"),
   authUserPanel: document.getElementById("authUserPanel"),
@@ -68,7 +77,7 @@ var els = {
   homeOverviewBadge: document.getElementById("homeOverviewBadge"),
   homeOverviewText: document.getElementById("homeOverviewText"),
   homeOpenPlannerBtn: document.getElementById("homeOpenPlannerBtn"),
-  homeOpenLibraryBtn: document.getElementById("homeOpenLibraryBtn"),
+  homeOpenProfileBtn: document.getElementById("homeOpenProfileBtn"),
   homeMiniLibraryBtn: document.getElementById("homeMiniLibraryBtn"),
   homeMetricPlans: document.getElementById("homeMetricPlans"),
   homeMetricArchived: document.getElementById("homeMetricArchived"),
@@ -93,6 +102,27 @@ var els = {
   footprintProvinceList: document.getElementById("footprintProvinceList"),
   footprintProvinceEmpty: document.getElementById("footprintProvinceEmpty"),
   footprintRankingList: document.getElementById("footprintRankingList"),
+  placeLibraryOpenPlannerBtn: document.getElementById("placeLibraryOpenPlannerBtn"),
+  placeLibraryOpenProfileBtn: document.getElementById("placeLibraryOpenProfileBtn"),
+  placeLibraryStatAll: document.getElementById("placeLibraryStatAll"),
+  placeLibraryStatPlay: document.getElementById("placeLibraryStatPlay"),
+  placeLibraryStatFood: document.getElementById("placeLibraryStatFood"),
+  placeLibraryStatStay: document.getElementById("placeLibraryStatStay"),
+  placeLibraryCount: document.getElementById("placeLibraryCount"),
+  placeFilterAllBtn: document.getElementById("placeFilterAllBtn"),
+  placeFilterPlayBtn: document.getElementById("placeFilterPlayBtn"),
+  placeFilterFoodBtn: document.getElementById("placeFilterFoodBtn"),
+  placeFilterStayBtn: document.getElementById("placeFilterStayBtn"),
+  placeFilterOtherBtn: document.getElementById("placeFilterOtherBtn"),
+  placeLibrarySearchInput: document.getElementById("placeLibrarySearchInput"),
+  placeLibrarySummary: document.getElementById("placeLibrarySummary"),
+  placeLibraryList: document.getElementById("placeLibraryList"),
+  placeLibraryEmpty: document.getElementById("placeLibraryEmpty"),
+  profileHubAuthBadge: document.getElementById("profileHubAuthBadge"),
+  profileHubName: document.getElementById("profileHubName"),
+  profileHubEmail: document.getElementById("profileHubEmail"),
+  profileHubPlaceCount: document.getElementById("profileHubPlaceCount"),
+  profileHubArchivedCount: document.getElementById("profileHubArchivedCount"),
   logoutBtn: document.getElementById("logoutBtn"),
   refreshPlansBtn: document.getElementById("refreshPlansBtn"),
   createBlankPlanBtn: document.getElementById("createBlankPlanBtn"),
@@ -114,9 +144,12 @@ var els = {
   homePlanEmpty: document.getElementById("libraryPlanEmpty"),
   currentPlanLabel: document.getElementById("currentPlanLabel"),
   saveCloudBtn: document.getElementById("saveCloudBtn"),
-  openLibraryBtn: document.getElementById("openLibraryBtn"),
-  openHomeBtn: document.getElementById("openLibraryBtn"),
+  openPlaceLibraryBtn: document.getElementById("openPlaceLibraryBtn"),
+  openProfileBtn: document.getElementById("openProfileBtn"),
+  plannerOpenPlaceLibraryBtn: document.getElementById("plannerOpenPlaceLibraryBtn"),
   cloudStatus: document.getElementById("cloudStatus"),
+  plannerPlaceSearchInput: document.getElementById("plannerPlaceSearchInput"),
+  plannerPlaceCategorySelect: document.getElementById("plannerPlaceCategorySelect"),
   tripName: document.getElementById("tripName"),
   travelerCount: document.getElementById("travelerCount"),
   startDate: document.getElementById("startDate"),
@@ -219,6 +252,11 @@ var currentPlanStatus = "";
 var planSearchQuery = "";
 var planFilter = "all";
 var planSort = "updated_desc";
+var placeLibraryFilter = "all";
+var placeLibrarySearchQuery = "";
+var plannerPlaceSearchQuery = "";
+var plannerPlaceFilter = "all";
+var placeLibraryNotice = "";
 
 function loadStoredValue(key, fallback = "") {
   try {
@@ -296,11 +334,15 @@ function normalizeState(raw) {
   next.places = Array.isArray(next.places) ? next.places.map((place) => ({
     id: place.id || uid("place"),
     name: place.name || "未命名地点",
+    category: place.category || "other",
+    province: place.province || "",
     city: place.city || "",
+    district: place.district || "",
     address: place.address || "",
     lng: toNumberOrNull(place.lng),
     lat: toNumberOrNull(place.lat),
-    poiId: place.poiId || ""
+    poiId: place.poiId || "",
+    sourceKey: place.sourceKey || ""
   })) : [];
   next.days = Array.isArray(next.days) ? next.days.map((day, dayIndex) => ({
     id: day.id || uid("day"),

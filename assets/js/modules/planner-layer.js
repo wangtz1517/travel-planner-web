@@ -143,7 +143,124 @@ function getDayStats(day) {
       distanceKm += Number(item.segment.distanceKm || 0);
     }
   });
-  return { stayMinutes, travelMinutes, distanceKm };
+  return {
+    stayMinutes,
+    travelMinutes,
+    distanceKm,
+    diagnostics: getDayDiagnostics(day, { stayMinutes, travelMinutes, distanceKm })
+  };
+}
+
+function inferPlaceLibraryCategory(item) {
+  const rawText = `${item?.type || ""} ${item?.name || ""}`.toLowerCase();
+  if (/(酒店|宾馆|民宿|客栈|住宿)/.test(rawText)) return "stay";
+  if (/(餐厅|美食|小吃|咖啡|奶茶|火锅|烤鸭|饭店)/.test(rawText)) return "food";
+  if (/(景点|公园|博物馆|乐园|古镇|广场|山|寺|玩)/.test(rawText)) return "play";
+  return "other";
+}
+
+function updatePlaceLibraryEntry(placeId, patch) {
+  const place = state.places.find((entry) => entry.id === placeId);
+  if (!place) return;
+  Object.assign(place, patch);
+  saveState(false);
+  renderAll();
+}
+
+function buildPlaceIdentityKey(entry) {
+  const poiId = normalizePlanText(entry?.poiId || "");
+  if (poiId) return `poi:${poiId}`;
+  const name = normalizePlanText(entry?.name || "");
+  const province = normalizePlanText(entry?.province || "");
+  const city = normalizePlanText(entry?.city || entry?.adcode || "");
+  const district = normalizePlanText(entry?.district || "");
+  const address = normalizePlanText(entry?.address || "");
+  const lng = toNumberOrNull(entry?.lng ?? entry?.location?.lng);
+  const lat = toNumberOrNull(entry?.lat ?? entry?.location?.lat);
+  const geo = lng != null && lat != null ? `|geo:${lng.toFixed(6)},${lat.toFixed(6)}` : "";
+  return `name:${name}|province:${province}|city:${city}|district:${district}|address:${address}${geo}`;
+}
+
+function findDuplicatePlace(item) {
+  const itemKey = buildPlaceIdentityKey(item);
+  return state.places.find((place) => buildPlaceIdentityKey(place) === itemKey) || null;
+}
+
+function getDayDiagnostics(day, stats = getDayStats(day)) {
+  const diagnostics = [];
+  const items = Array.isArray(day?.items) ? day.items : [];
+  const middleStops = Math.max(0, items.length - 2);
+  const firstItem = items[0] || null;
+  const lastItem = items[items.length - 1] || null;
+  const firstStartMinutes = parseClock(firstItem?.startTime || "");
+  const lastLeaveMinutes = parseClock(lastItem?.leaveTime || lastItem?.arrivalTime || "");
+  const hasMissingSchedule = items.some((item, index) => {
+    if (index === 0) return parseClock(item.startTime || "") == null;
+    const arrival = parseClock(item.arrivalTime || "");
+    if (arrival == null) return true;
+    if (index < items.length - 1) {
+      const leave = parseClock(item.leaveTime || "");
+      if (leave == null || leave < arrival) return true;
+    }
+    return false;
+  });
+
+  if (!items.length) {
+    diagnostics.push({
+      level: "info",
+      tone: "calm",
+      label: "待开始",
+      message: "这一天还没有安排地点，可以先从起点和核心目的地开始。"
+    });
+    return diagnostics;
+  }
+
+  if (hasMissingSchedule || firstStartMinutes == null) {
+    diagnostics.push({
+      level: "warning",
+      tone: "danger",
+      label: "时间冲突",
+      message: "部分时间未形成有效衔接，请检查出发时间或停留时长。"
+    });
+  }
+
+  if (lastLeaveMinutes != null && lastLeaveMinutes >= 21 * 60 + 30) {
+    diagnostics.push({
+      level: "warning",
+      tone: "warning",
+      label: "结束偏晚",
+      message: `当前预计结束时间约 ${formatClock(lastItem?.leaveTime || lastItem?.arrivalTime)}，节奏偏晚。`
+    });
+  }
+
+  if (stats.travelMinutes >= 180 || stats.distanceKm >= 80) {
+    diagnostics.push({
+      level: "warning",
+      tone: "warning",
+      label: "奔波偏多",
+      message: "当天路程较长，建议压缩跨城或远距离移动。"
+    });
+  }
+
+  if (middleStops >= 6 || (middleStops >= 5 && stats.travelMinutes >= 120)) {
+    diagnostics.push({
+      level: "warning",
+      tone: "warning",
+      label: "节奏过满",
+      message: `当前共安排 ${middleStops} 个中间停留点，建议删减或拆分到其他天。`
+    });
+  }
+
+  if (!diagnostics.length && middleStops > 0 && stats.travelMinutes <= 90 && lastLeaveMinutes != null && lastLeaveMinutes <= 20 * 60) {
+    diagnostics.push({
+      level: "info",
+      tone: "positive",
+      label: "节奏平衡",
+      message: "当天节奏较均衡，可以继续细化备注、预约和预算。"
+    });
+  }
+
+  return diagnostics;
 }
 
 function getDropIndex(dropZone, clientY) {
@@ -202,25 +319,64 @@ function clearSuggestions() {
   els.suggestions.innerHTML = "";
 }
 
-function addPlaceFromSuggestion(item) {
+function removeSuggestionFromList(item) {
   if (!item) return;
-  const exists = state.places.some((place) => (place.poiId && item.id && place.poiId === item.id) || place.name === item.name);
-  if (exists) {
-    els.searchKeyword.value = "";
+  suggestions = suggestions.filter((entry) => {
+    if (entry.id && item.id) return entry.id !== item.id;
+    return !(
+      String(entry.name || "").trim() === String(item.name || "").trim() &&
+      String(entry.address || "").trim() === String(item.address || "").trim()
+    );
+  });
+  activeSuggestionIndex = suggestions.length ? Math.min(activeSuggestionIndex, suggestions.length - 1) : -1;
+}
+
+function refreshPlaceLibraryPanels() {
+  renderPlaces();
+  renderPlaceLibraryList();
+  renderProfileHub();
+}
+
+function refreshSuggestionsForCurrentKeyword() {
+  const keyword = els.searchKeyword.value.trim();
+  if (!keyword) {
     clearSuggestions();
     return;
   }
+  searchPlaces(keyword);
+}
+
+function addPlaceFromSuggestion(item) {
+  if (!item) return;
+  const existingPlace = findDuplicatePlace(item);
+  if (existingPlace) {
+    placeLibraryNotice = `已跳过重复地点：${existingPlace.name}`;
+    setCloudStatus(`地点库里已经有“${existingPlace.name}”，已跳过重复添加。`);
+    removeSuggestionFromList(item);
+    renderSuggestions();
+    refreshPlaceLibraryPanels();
+    return;
+  }
+  const nextPlaceName = item.name || "未命名地点";
   state.places.push({
     id: uid("place"),
-    name: item.name || "未命名地点",
+    name: nextPlaceName,
+    category: inferPlaceLibraryCategory(item),
+    province: item.pname || "",
     city: item.city || item.adcode || "",
+    district: item.district || "",
     address: item.address || item.district || "",
     lng: item.location?.lng ?? null,
     lat: item.location?.lat ?? null,
-    poiId: item.id || ""
+    poiId: item.id || "",
+    sourceKey: buildPlaceIdentityKey(item)
   });
+  placeLibraryFilter = "all";
+  placeLibrarySearchQuery = "";
+  placeLibraryNotice = `已加入地点库：${nextPlaceName}`;
   saveState();
-  renderPlaces();
-  els.searchKeyword.value = "";
-  clearSuggestions();
+  setCloudStatus(`已加入地点库：${nextPlaceName}`);
+  removeSuggestionFromList(item);
+  renderSuggestions();
+  refreshPlaceLibraryPanels();
 }

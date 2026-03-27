@@ -191,19 +191,22 @@ var els = {
   socialUnreadCount: document.getElementById("socialUnreadCount"),
   socialShareCount: document.getElementById("socialShareCount"),
   socialNetworkHint: document.getElementById("socialNetworkHint"),
+  socialOperationsHint: document.getElementById("socialOperationsHint"),
+  socialShowDiscoveryBtn: document.getElementById("socialShowDiscoveryBtn"),
+  socialShowRequestsBtn: document.getElementById("socialShowRequestsBtn"),
+  socialDiscoveryPanel: document.getElementById("socialDiscoveryPanel"),
+  socialRequestPanel: document.getElementById("socialRequestPanel"),
   socialSearchInput: document.getElementById("socialSearchInput"),
   socialQuickAddBtn: document.getElementById("socialQuickAddBtn"),
   socialDiscoveryList: document.getElementById("socialDiscoveryList"),
   socialRequestList: document.getElementById("socialRequestList"),
   socialFriendList: document.getElementById("socialFriendList"),
-  socialConversationTabs: document.getElementById("socialConversationTabs"),
   socialConversationTitle: document.getElementById("socialConversationTitle"),
   socialConversationMeta: document.getElementById("socialConversationMeta"),
   socialConversationFeed: document.getElementById("socialConversationFeed"),
   socialMessageInput: document.getElementById("socialMessageInput"),
   socialSendMessageBtn: document.getElementById("socialSendMessageBtn"),
   socialSharePlanBtn: document.getElementById("socialSharePlanBtn"),
-  socialShareFeed: document.getElementById("socialShareFeed"),
   logoutBtn: document.getElementById("logoutBtn"),
   refreshPlansBtn: document.getElementById("refreshPlansBtn"),
   createBlankPlanBtn: document.getElementById("createBlankPlanBtn"),
@@ -344,6 +347,7 @@ var placeLibraryCloudStatus = createDefaultPlaceLibraryCloudStatus();
 var persistGuestPlaceLibraryChanges = true;
 var socialScopeKey = "";
 var socialSearchQuery = "";
+var socialOperationsTab = "discovery";
 var selectedConversationId = "";
 var socialState = createDefaultSocialState();
 

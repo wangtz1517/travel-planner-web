@@ -6,7 +6,7 @@
   <title>行旅派 | GoPace</title>
   <meta name="description" content="行旅派 GoPace：支持账号、计划归档与多日路线整理的旅行规划工具">
   <link rel="icon" type="image/svg+xml" href="logo/logo-symbol-color.svg?v=20260324-1">
-  <link rel="stylesheet" href="assets/css/main.css?v=20260327-30">
+  <link rel="stylesheet" href="assets/css/main.css?v=20260328-4">
 </head>
 <body>
   <div class="app-shell">
@@ -337,131 +337,107 @@
     </section>
 
     <section id="communityPage" class="page-section library-page" hidden>
-      <section class="card home-card plans-card library-card">
+      <section class="card home-card plans-card library-card community-card">
         <div class="section-head">
-          <div>
+          <div class="community-head-copy">
             <p class="eyebrow">Community</p>
-            <h2>社区页</h2>
+            <div class="community-title-row">
+              <h2>社区页</h2>
+              <p class="panel-note community-head-note">左边处理总览、好友申请和搭子发现，右边像网页版聊天工具一样专注于具体好友对话。</p>
+            </div>
           </div>
-        </div>
-        <p class="panel-note">这里集中管理旅行搭子、私信和行程分享，把原先放在个人信息页里的好友相关能力单独收拢成一页，社区入口也放到了个人信息前面。</p>
-
-        <div class="profile-hub-grid">
-          <section class="profile-hub-card">
-            <div class="sub-head">
-              <div>
-                <h3>好友中心总览</h3>
-                <p class="muted">把搭子、私信和行程分享集中到社区中</p>
-              </div>
-              <span id="socialModeBadge" class="status-badge">本地预览</span>
-            </div>
-            <div class="profile-feature-list social-overview-metrics">
-              <article class="overview-metric-card">
-                <span>好友数量</span>
-                <strong id="socialFriendCount">0</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>待处理申请</span>
-                <strong id="socialRequestCount">0</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>未读私信</span>
-                <strong id="socialUnreadCount">0</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>分享动态</span>
-                <strong id="socialShareCount">0</strong>
-              </article>
-            </div>
-          </section>
-
-          <section class="profile-hub-card">
-            <div class="sub-head">
-              <div>
-                <h3>当前阶段</h3>
-                <p class="muted">先把社交链路单独拉直，后续再继续接入云端</p>
-              </div>
-            </div>
-            <div class="profile-feature-list">
-              <p class="panel-note">推荐好友：按昵称、邮箱或城市搜索潜在搭子，先建立轻关系。</p>
-              <p class="panel-note">私信对话：围绕路线、预算和集合点持续沟通，不把讨论塞回个人页。</p>
-              <p class="panel-note">行程分享：把当前绑定计划或当前草稿直接发给好友，验证分享闭环。</p>
-              <p class="panel-note">本地预览：当前仍按账号维度做本地持久化，后续再接 Supabase 云端同步。</p>
-            </div>
-          </section>
+          <span id="socialModeBadge" class="status-badge">本地预览</span>
         </div>
 
-        <div class="social-hub-layout">
-          <section class="social-panel social-network-panel">
-            <div class="sub-head">
-              <div>
-                <h3>好友网络</h3>
-                <p id="socialNetworkHint" class="muted">添加旅行搭子、处理好友申请，并把合适的行程分享给他们。</p>
-              </div>
-            </div>
-            <div class="social-add-bar">
-              <label class="plan-search-field social-search-field">
-                <span>添加好友</span>
-                <input id="socialSearchInput" type="search" placeholder="搜昵称、邮箱或城市">
-              </label>
-              <button id="socialQuickAddBtn" type="button" class="small">发送申请</button>
-            </div>
-            <div id="socialDiscoveryList" class="social-discovery-list"></div>
-            <div class="social-panel-section">
-              <div class="sub-head social-sub-head">
+        <div class="community-workbench">
+          <aside class="community-overview-column">
+            <section class="social-panel social-overview-panel">
+              <div class="sub-head">
                 <div>
-                  <h4>待处理申请</h4>
-                  <p class="muted">可以先接受常用搭子，后续再分享路线</p>
+                  <h3>社区总览</h3>
+                  <p id="socialNetworkHint" class="muted">把搭子管理和对话入口集中到一个工作台里。</p>
                 </div>
               </div>
-              <div id="socialRequestList" class="social-request-list"></div>
-            </div>
-            <div class="social-panel-section">
-              <div class="sub-head social-sub-head">
+              <div class="profile-feature-list social-overview-metrics">
+                <article class="overview-metric-card">
+                  <span>好友数量</span>
+                  <strong id="socialFriendCount">0</strong>
+                </article>
+                <article class="overview-metric-card">
+                  <span>待处理申请</span>
+                  <strong id="socialRequestCount">0</strong>
+                </article>
+                <article class="overview-metric-card">
+                  <span>未读私信</span>
+                  <strong id="socialUnreadCount">0</strong>
+                </article>
+                <article class="overview-metric-card">
+                  <span>活跃会话</span>
+                  <strong id="socialShareCount">0</strong>
+                </article>
+              </div>
+            </section>
+
+            <section class="social-panel social-operations-panel">
+              <div class="sub-head social-operations-head">
                 <div>
+                  <h3>社交操作区</h3>
+                  <p id="socialOperationsHint" class="muted community-section-note">按昵称、邮箱或城市搜索潜在搭子，先建立轻关系。</p>
+                </div>
+                <div class="social-operations-tabs" aria-label="社区左侧操作切换">
+                  <button id="socialShowDiscoveryBtn" type="button" class="social-operations-tab active">添加旅伴</button>
+                  <button id="socialShowRequestsBtn" type="button" class="social-operations-tab">待处理申请</button>
+                </div>
+              </div>
+              <div id="socialDiscoveryPanel" class="social-operations-body">
+                <div class="social-add-bar">
+                  <label class="plan-search-field social-search-field">
+                    <span>搜索好友</span>
+                    <input id="socialSearchInput" type="search" placeholder="搜昵称、邮箱或城市">
+                  </label>
+                  <button id="socialQuickAddBtn" type="button" class="small">发送申请</button>
+                </div>
+                <div id="socialDiscoveryList" class="social-discovery-list"></div>
+              </div>
+              <div id="socialRequestPanel" class="social-operations-body" hidden>
+                <div id="socialRequestList" class="social-request-list"></div>
+              </div>
+            </section>
+          </aside>
+
+          <section class="social-panel social-chat-panel">
+            <div class="sub-head">
+              <div>
+                <h3>旅伴私信</h3>
+              </div>
+            </div>
+
+            <div class="social-chat-shell">
+              <aside class="social-chat-sidebar">
+                <div class="social-chat-sidebar-head">
                   <h4>好友列表</h4>
-                  <p class="muted">从这里可以直接打开私信或发出当前行程</p>
+                </div>
+                <div id="socialFriendList" class="social-chat-list"></div>
+              </aside>
+
+              <div class="social-chat-window">
+                <div class="social-conversation-header">
+                  <div>
+                    <h4 id="socialConversationTitle">先选择一个好友</h4>
+                    <p id="socialConversationMeta" class="muted">好友接受申请后，就能在这里持续沟通和分享路线。</p>
+                  </div>
+                </div>
+                <div id="socialConversationFeed" class="social-conversation-feed"></div>
+                <label class="social-message-field">
+                  <span>发送消息</span>
+                  <textarea id="socialMessageInput" rows="3" placeholder="例如：周六上午先去美术馆，下午再去咖啡馆会不会更顺？"></textarea>
+                </label>
+                <div class="social-composer-actions">
+                  <button id="socialSendMessageBtn" type="button" class="small">发送私信</button>
+                  <button id="socialSharePlanBtn" type="button" class="ghost small">分享当前行程</button>
                 </div>
               </div>
-              <div id="socialFriendList" class="social-friend-list"></div>
             </div>
-          </section>
-
-          <section class="social-panel social-conversation-panel">
-            <div class="sub-head">
-              <div>
-                <h3>私信对话</h3>
-                <p class="muted">聊路线、预算和集合点，也可以在会话里直接分享计划。</p>
-              </div>
-            </div>
-            <div id="socialConversationTabs" class="social-conversation-tabs"></div>
-            <div class="social-conversation-shell">
-              <div class="social-conversation-header">
-                <div>
-                  <h4 id="socialConversationTitle">先选择一个好友</h4>
-                  <p id="socialConversationMeta" class="muted">好友接受申请后，就能在这里持续沟通和分享路线。</p>
-                </div>
-              </div>
-              <div id="socialConversationFeed" class="social-conversation-feed"></div>
-              <label class="social-message-field">
-                <span>发送消息</span>
-                <textarea id="socialMessageInput" rows="3" placeholder="例如：周六上午先去美术馆，下午再去咖啡馆会不会更顺？"></textarea>
-              </label>
-              <div class="social-composer-actions">
-                <button id="socialSendMessageBtn" type="button" class="small">发送私信</button>
-                <button id="socialSharePlanBtn" type="button" class="ghost small">分享当前行程</button>
-              </div>
-            </div>
-          </section>
-
-          <section class="social-panel social-share-panel">
-            <div class="sub-head">
-              <div>
-                <h3>分享动态</h3>
-                <p class="muted">最近发出的计划、收到的路线灵感，以及分享后的状态更新。</p>
-              </div>
-            </div>
-            <div id="socialShareFeed" class="social-share-feed"></div>
           </section>
         </div>
       </section>
@@ -753,13 +729,13 @@
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/modules/state-layer.js?v=20260327-22"></script>
+  <script src="assets/js/modules/state-layer.js?v=20260328-2"></script>
   <script src="assets/js/modules/planner-layer.js?v=20260327-6"></script>
   <script src="assets/js/modules/map-layer.js?v=20260325-1"></script>
   <script src="assets/js/modules/footprint-layer.js?v=20260325-1"></script>
-  <script src="assets/js/modules/render-layer.js?v=20260327-24"></script>
+  <script src="assets/js/modules/render-layer.js?v=20260328-4"></script>
   <script src="assets/js/modules/auth-layer.js?v=20260327-7"></script>
-  <script src="assets/js/app.js?v=20260327-23"></script>
+  <script src="assets/js/app.js?v=20260328-1"></script>
 </body>
 </html>
 

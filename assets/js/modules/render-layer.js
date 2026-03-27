@@ -733,6 +733,18 @@ function formatSocialTime(value) {
   });
 }
 
+function getSocialAvatarText(name = "") {
+  const raw = String(name || "").trim();
+  if (!raw) return "友";
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2 && tokens.every((token) => /^[A-Za-z0-9]+$/.test(token))) {
+    return tokens.slice(0, 2).map((token) => token[0].toUpperCase()).join("");
+  }
+  const ascii = raw.replace(/[^A-Za-z0-9]/g, "");
+  if (ascii) return ascii.slice(0, 2).toUpperCase();
+  return raw.slice(0, 2);
+}
+
 function renderSocialHub() {
   syncSocialStateScope();
   const signedIn = Boolean(authSession?.user);
@@ -743,19 +755,26 @@ function renderSocialHub() {
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
   const friends = getSocialFriends();
   const conversations = getSocialConversations();
-  const shares = getSocialShares();
   const selectedConversation = getSelectedSocialConversation();
   const selectedProfile = selectedConversation ? getSocialProfile(selectedConversation.participantId) : null;
   const unreadCount = conversations.reduce((sum, conversation) => sum + Number(conversation.unreadCount || 0), 0);
+  const activeConversationCount = conversations.length;
 
   els.socialModeBadge.textContent = signedIn ? "账号本地版" : "本地预览";
   els.socialFriendCount.textContent = String(friends.length);
   els.socialRequestCount.textContent = String(pendingRequests.length);
   els.socialUnreadCount.textContent = String(unreadCount);
-  els.socialShareCount.textContent = String(shares.length);
+  els.socialShareCount.textContent = String(activeConversationCount);
   els.socialNetworkHint.textContent = signedIn
-    ? "先在这里验证加好友、私信和行程分享链路；当前按账号做本地持久化，后续再接云端同步。"
-    : "当前展示的是社交模块预览态，登录后会按账号维度保留好友和私信数据。";
+    ? "管理搭子、申请和会话入口。"
+    : "登录后按账号保留好友和私信。";
+  els.socialOperationsHint.textContent = socialOperationsTab === "requests"
+    ? "先处理新的好友申请，再去右侧继续聊天。"
+    : "按昵称、邮箱或城市搜索潜在搭子，先建立轻关系。";
+  els.socialShowDiscoveryBtn.classList.toggle("active", socialOperationsTab !== "requests");
+  els.socialShowRequestsBtn.classList.toggle("active", socialOperationsTab === "requests");
+  els.socialDiscoveryPanel.hidden = socialOperationsTab === "requests";
+  els.socialRequestPanel.hidden = socialOperationsTab !== "requests";
   if (els.socialSearchInput.value !== socialSearchQuery) {
     els.socialSearchInput.value = socialSearchQuery;
   }
@@ -874,78 +893,38 @@ function renderSocialHub() {
   if (!friends.length) {
     const empty = document.createElement("div");
     empty.className = "empty-block";
-    empty.textContent = "还没有好友，先从上面的推荐中加几个常用搭子，再开始分享你的行程。";
+    empty.textContent = "还没有好友，先在左侧加几个常用搭子，右侧聊天区就会自动出现对应会话。";
     els.socialFriendList.appendChild(empty);
   } else {
     friends.forEach((friend) => {
       const lastMessage = friend.conversation?.messages?.slice(-1)[0] || null;
-      const article = document.createElement("article");
-      article.className = "social-card";
-      article.innerHTML = `
-        <div class="social-card-top">
-          <div>
-            <h4>${escapeHtml(friend.profile.name)}</h4>
-            <p class="muted">${escapeHtml(friend.profile.handle)}${friend.profile.city ? ` · ${escapeHtml(friend.profile.city)}` : ""}</p>
-          </div>
-          ${friend.conversation?.unreadCount ? `<span class="social-chip tone-unread">${escapeHtml(String(friend.conversation.unreadCount))} 未读</span>` : `<span class="social-chip">好友</span>`}
-        </div>
-        <p class="panel-note social-card-note">${escapeHtml(lastMessage?.text || friend.profile.note || "已经建立好友关系，可以直接开聊。")}</p>
-        <div class="social-tag-list">
-          ${(friend.profile.tags || []).map((tag) => `<span class="social-tag">${escapeHtml(tag)}</span>`).join("")}
-        </div>
-        <div class="social-inline-meta">
-          <span>${lastMessage ? `最近互动 ${escapeHtml(formatSocialTime(lastMessage.createdAt))}` : `成为好友 ${escapeHtml(formatSocialTime(friend.connectedAt))}`}</span>
-        </div>
+      const button = document.createElement("button");
+      const isActive = selectedConversation?.participantId === friend.profileId;
+      const previewText = lastMessage?.type === "share"
+        ? `行程分享：${lastMessage.planTitle || lastMessage.text || "未命名旅行"}`
+        : lastMessage?.text || friend.profile.note || "已经建立好友关系，可以直接开聊。";
+      button.type = "button";
+      button.className = `social-chat-contact${isActive ? " active" : ""}`;
+      button.innerHTML = `
+        <span class="social-chat-avatar">${escapeHtml(getSocialAvatarText(friend.profile.name))}</span>
+        <span class="social-chat-contact-main">
+          <span class="social-chat-contact-top">
+            <strong class="social-chat-contact-name">${escapeHtml(friend.profile.name)}</strong>
+            <span class="social-chat-time">${escapeHtml(formatSocialTime(lastMessage?.createdAt || friend.connectedAt))}</span>
+          </span>
+          <span class="social-chat-contact-preview">${escapeHtml(previewText)}</span>
+        </span>
+        <span class="social-chat-contact-meta">
+          ${friend.conversation?.unreadCount
+            ? `<span class="social-chat-badge">${escapeHtml(String(friend.conversation.unreadCount))}</span>`
+            : `<span class="social-chat-badge is-muted">友</span>`}
+        </span>
       `;
-      const actions = document.createElement("div");
-      actions.className = "social-card-actions";
-      const chatBtn = document.createElement("button");
-      chatBtn.type = "button";
-      chatBtn.className = "small";
-      chatBtn.textContent = "打开私信";
-      chatBtn.addEventListener("click", () => {
+      button.addEventListener("click", () => {
         openSocialConversation(friend.profileId);
         renderSocialHub();
       });
-      const shareBtn = document.createElement("button");
-      shareBtn.type = "button";
-      shareBtn.className = "ghost small";
-      shareBtn.textContent = "分享当前行程";
-      shareBtn.addEventListener("click", () => {
-        const result = sharePlanWithFriend(friend.profileId);
-        if (!result.ok) {
-          setAccountFeedback(result.message, true);
-          return;
-        }
-        setAccountFeedback(`已把《${result.planTitle}》分享给 ${friend.profile.name}。`);
-        renderSocialHub();
-      });
-      actions.append(chatBtn, shareBtn);
-      article.append(actions);
-      els.socialFriendList.appendChild(article);
-    });
-  }
-
-  els.socialConversationTabs.innerHTML = "";
-  if (!conversations.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-block social-tabs-empty";
-    empty.textContent = "好友通过后，会在这里自动生成私信会话。";
-    els.socialConversationTabs.appendChild(empty);
-  } else {
-    conversations.forEach((conversation) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = `social-conversation-tab${selectedConversation?.id === conversation.id ? " active" : ""}`;
-      button.innerHTML = `
-        <span>${escapeHtml(conversation.profile.name)}</span>
-        ${conversation.unreadCount ? `<span class="social-tab-count">${escapeHtml(String(conversation.unreadCount))}</span>` : ""}
-      `;
-      button.addEventListener("click", () => {
-        openSocialConversation(conversation.participantId);
-        renderSocialHub();
-      });
-      els.socialConversationTabs.appendChild(button);
+      els.socialFriendList.appendChild(button);
     });
   }
 
@@ -959,7 +938,7 @@ function renderSocialHub() {
   if (!selectedConversation) {
     const empty = document.createElement("div");
     empty.className = "empty-block";
-    empty.textContent = "左侧选择一个好友，或者先接受新的好友申请，就能开始私信对话。";
+    empty.textContent = "左侧先选择一个好友，或者先接受新的好友申请，右侧就会打开对应聊天窗。";
     els.socialConversationFeed.appendChild(empty);
   } else if (!selectedConversation.messages.length) {
     const empty = document.createElement("div");
@@ -999,28 +978,6 @@ function renderSocialHub() {
     els.socialMessageInput.placeholder = "先在左侧打开一个好友会话";
   } else {
     els.socialMessageInput.placeholder = `发给 ${selectedProfile?.name || "好友"} 的消息`;
-  }
-
-  els.socialShareFeed.innerHTML = "";
-  if (!shares.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-block";
-    empty.textContent = "还没有分享动态，等你把第一条行程发给好友后，这里会开始沉淀记录。";
-    els.socialShareFeed.appendChild(empty);
-  } else {
-    shares.forEach((share) => {
-      const article = document.createElement("article");
-      article.className = "social-share-item";
-      article.innerHTML = `
-        <div class="social-share-top">
-          <strong>${escapeHtml(share.direction === "received" ? `${share.profile.name} 分享给你` : `你分享给 ${share.profile.name}`)}</strong>
-          <span class="muted">${escapeHtml(formatSocialTime(share.createdAt))}</span>
-        </div>
-        <p class="social-share-title">《${escapeHtml(share.planTitle || "未命名旅行")}》</p>
-        <p class="panel-note social-card-note">${escapeHtml(share.note || "这条分享还没有附加说明。")}</p>
-      `;
-      els.socialShareFeed.appendChild(article);
-    });
   }
 }
 

@@ -230,6 +230,14 @@ function bindEvents() {
     setSocialSearchQuery(els.socialSearchInput.value);
     renderSocialHub();
   });
+  els.socialShowDiscoveryBtn.addEventListener("click", () => {
+    socialOperationsTab = "discovery";
+    renderSocialHub();
+  });
+  els.socialShowRequestsBtn.addEventListener("click", () => {
+    socialOperationsTab = "requests";
+    renderSocialHub();
+  });
   els.socialQuickAddBtn.addEventListener("click", () => {
     const nextProfile = getSocialDiscoveryResults()[0];
     if (!nextProfile) {

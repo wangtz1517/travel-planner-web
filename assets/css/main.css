@@ -494,6 +494,11 @@ h1, h2, h3, h4, p { margin: 0; }
   background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,247,240,0.96));
   box-shadow: 0 10px 22px rgba(89, 63, 39, 0.08);
 }
+.place-library-add-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
 .place-library-main {
   min-height: 0;
   display: grid;

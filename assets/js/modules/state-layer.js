@@ -3,6 +3,8 @@ var PAGE_STORAGE_KEY = "gopace_active_page";
 var AUTH_VIEW_STORAGE_KEY = "gopace_auth_view";
 var CURRENT_PLAN_STORAGE_KEY = "gopace_current_plan_id";
 var GUEST_DRAFT_MIGRATION_STORAGE_KEY = "gopace_guest_draft_migration";
+var GUEST_PLACE_LIBRARY_STORAGE_KEY = "gopace_guest_place_library_v1";
+var GUEST_PLACE_LIBRARY_MIGRATION_STORAGE_KEY = "gopace_guest_place_library_migration";
 var PLAN_LIBRARY_META_STORAGE_KEY = "gopace_plan_library_meta";
 var SOCIAL_STORAGE_KEY = "gopace_social_v1";
 
@@ -256,7 +258,7 @@ var els = {
 };
 
 var state = loadState();
-var placeLibraryState = normalizePlaceCollection(state.places);
+var placeLibraryState = loadInitialPlaceLibraryState(state);
 state.places = clonePlaceCollection(placeLibraryState);
 var selectedDayId = state.days[0]?.id || "";
 var activePage = loadStoredValue(PAGE_STORAGE_KEY, PAGES.home);
@@ -338,6 +340,8 @@ var placeLibrarySearchQuery = "";
 var plannerPlaceSearchQuery = "";
 var plannerPlaceFilter = "all";
 var placeLibraryNotice = "";
+var placeLibraryCloudStatus = createDefaultPlaceLibraryCloudStatus();
+var persistGuestPlaceLibraryChanges = true;
 var socialScopeKey = "";
 var socialSearchQuery = "";
 var selectedConversationId = "";
@@ -434,6 +438,94 @@ function normalizePlaceCollection(places) {
 
 function clonePlaceCollection(places) {
   return normalizePlaceCollection(places);
+}
+
+function createDefaultPlaceLibraryCloudStatus() {
+  return {
+    mode: "guest",
+    phase: "idle",
+    detail: "",
+    lastSyncedAt: ""
+  };
+}
+
+function setPlaceLibraryCloudStatus(patch = {}) {
+  placeLibraryCloudStatus = {
+    ...createDefaultPlaceLibraryCloudStatus(),
+    ...placeLibraryCloudStatus,
+    ...(patch || {})
+  };
+  return placeLibraryCloudStatus;
+}
+
+function getPlaceLibraryLastSyncedAt() {
+  return placeLibraryCloudStatus?.lastSyncedAt || authProfile?.place_library_synced_at || "";
+}
+
+function loadGuestPlaceLibrary() {
+  const storedPlaces = loadStoredJson(GUEST_PLACE_LIBRARY_STORAGE_KEY, null);
+  if (Array.isArray(storedPlaces)) return normalizePlaceCollection(storedPlaces);
+  const legacyState = loadStoredJson(STORAGE_KEY, {});
+  const legacyPlaces = normalizePlaceCollection(legacyState?.places);
+  if (legacyPlaces.length) persistGuestPlaceLibrary(legacyPlaces);
+  return legacyPlaces;
+}
+
+function loadInitialPlaceLibraryState(planState) {
+  const guestPlaces = loadGuestPlaceLibrary();
+  if (guestPlaces.length) return guestPlaces;
+  return normalizePlaceCollection(planState?.places);
+}
+
+function persistGuestPlaceLibrary(nextPlaces = placeLibraryState) {
+  persistStoredJson(GUEST_PLACE_LIBRARY_STORAGE_KEY, normalizePlaceCollection(nextPlaces));
+}
+
+function restoreGuestPlaceLibrary() {
+  replacePlaceLibrary(loadGuestPlaceLibrary());
+  persistGuestPlaceLibraryChanges = false;
+  setPlaceLibraryCloudStatus(createDefaultPlaceLibraryCloudStatus());
+  return placeLibraryState;
+}
+
+function buildPlaceLibraryFingerprint(places = placeLibraryState) {
+  const normalizedPlaces = normalizePlaceCollection(places)
+    .map((place) => ({
+      key: buildPlaceLibraryMergeKey(place),
+      name: place.name || "",
+      category: place.category || "other",
+      province: place.province || "",
+      city: place.city || "",
+      district: place.district || "",
+      address: place.address || "",
+      poiId: place.poiId || "",
+      sourceKey: place.sourceKey || "",
+      lng: toNumberOrNull(place.lng),
+      lat: toNumberOrNull(place.lat)
+    }))
+    .sort((left, right) => left.key.localeCompare(right.key));
+  return normalizedPlaces.length ? JSON.stringify(normalizedPlaces) : "";
+}
+
+function loadGuestPlaceLibraryMigrationMap() {
+  return loadStoredJson(GUEST_PLACE_LIBRARY_MIGRATION_STORAGE_KEY, {});
+}
+
+function persistGuestPlaceLibraryMigrationMap(migrationMap) {
+  persistStoredJson(GUEST_PLACE_LIBRARY_MIGRATION_STORAGE_KEY, migrationMap || {});
+}
+
+function hasGuestPlaceLibraryMigrationRecord(userId, fingerprint) {
+  if (!userId || !fingerprint) return false;
+  const migrationMap = loadGuestPlaceLibraryMigrationMap();
+  return migrationMap[userId] === fingerprint;
+}
+
+function markGuestPlaceLibraryMigrated(userId, fingerprint) {
+  if (!userId || !fingerprint) return;
+  const migrationMap = loadGuestPlaceLibraryMigrationMap();
+  migrationMap[userId] = fingerprint;
+  persistGuestPlaceLibraryMigrationMap(migrationMap);
 }
 
 function normalizeState(raw) {
@@ -583,6 +675,7 @@ function handleTripDateRangePick() {
 function replacePlaceLibrary(nextPlaces) {
   placeLibraryState = normalizePlaceCollection(nextPlaces);
   state.places = clonePlaceCollection(placeLibraryState);
+  persistGuestPlaceLibraryChanges = true;
   return state.places;
 }
 
@@ -627,7 +720,13 @@ function arePlaceCollectionsEqual(left, right) {
 function saveState(showStatus = true) {
   state.places = clonePlaceCollection(placeLibraryState);
   syncTripInputsToState();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const persistedState = normalizeState(state);
+  if (authSession?.user) {
+    persistedState.places = [];
+  } else if (persistGuestPlaceLibraryChanges) {
+    persistGuestPlaceLibrary(placeLibraryState);
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedState));
   if (showStatus) {
     els.saveStatus.textContent = `已保存 ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
   }

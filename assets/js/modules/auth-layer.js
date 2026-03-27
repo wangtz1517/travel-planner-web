@@ -35,6 +35,8 @@ async function refreshAccountData() {
   authProfile = null;
   if (!authSession?.user) {
     myPlans = [];
+    restoreGuestPlaceLibrary();
+    saveState(false);
     renderAll();
     return;
   }
@@ -104,26 +106,50 @@ function getCloudPlaceLibrarySnapshot() {
   return normalizePlaceCollection(authProfile?.place_library_snapshot);
 }
 
-function isPlaceLibraryColumnMissing(error) {
-  return String(error?.message || "").includes("place_library_snapshot");
+function getCloudPlaceLibrarySyncedAt() {
+  return authProfile?.place_library_synced_at || "";
+}
+
+function isPlaceLibrarySchemaMissing(error) {
+  const message = String(error?.message || "");
+  return message.includes("place_library_snapshot") || message.includes("place_library_synced_at");
 }
 
 async function persistPlaceLibraryToCloud(nextPlaces = placeLibraryState, options = {}) {
   if (!supabaseClient || !authSession?.user) return null;
   const { silent = false, successMessage = "" } = options;
+  const normalizedPlaces = normalizePlaceCollection(nextPlaces);
+  const syncedAt = new Date().toISOString();
+  setPlaceLibraryCloudStatus({
+    mode: "cloud",
+    phase: "syncing",
+    detail: silent ? "" : "正在同步地点库...",
+    lastSyncedAt: getPlaceLibraryLastSyncedAt()
+  });
+  if (typeof refreshPlaceLibraryPanels === "function") refreshPlaceLibraryPanels();
   const { data, error } = await supabaseClient
     .from("profiles")
-    .update({ place_library_snapshot: normalizePlaceCollection(nextPlaces) })
+    .update({
+      place_library_snapshot: normalizedPlaces,
+      place_library_synced_at: syncedAt
+    })
     .eq("id", authSession.user.id)
     .select("*")
     .single();
   if (error) {
-    if (isPlaceLibraryColumnMissing(error)) {
-      throw new Error("请先在 Supabase SQL Editor 执行 002-profile-place-library.sql 脚本");
+    if (isPlaceLibrarySchemaMissing(error)) {
+      throw new Error("请先在 Supabase SQL Editor 执行 002-profile-place-library.sql 和 003-profile-place-library-sync.sql 脚本");
     }
     throw error;
   }
   authProfile = data || authProfile;
+  setPlaceLibraryCloudStatus({
+    mode: "cloud",
+    phase: "idle",
+    detail: successMessage,
+    lastSyncedAt: authProfile?.place_library_synced_at || syncedAt
+  });
+  if (typeof refreshPlaceLibraryPanels === "function") refreshPlaceLibraryPanels();
   if (!silent && successMessage) {
     setCloudStatus(successMessage);
   }
@@ -135,6 +161,13 @@ async function syncPlaceLibraryToCloud(options = {}) {
   try {
     return await persistPlaceLibraryToCloud(placeLibraryState, options);
   } catch (error) {
+    setPlaceLibraryCloudStatus({
+      mode: authSession?.user ? "cloud" : "guest",
+      phase: "error",
+      detail: error.message,
+      lastSyncedAt: getPlaceLibraryLastSyncedAt()
+    });
+    if (typeof refreshPlaceLibraryPanels === "function") refreshPlaceLibraryPanels();
     if (!silent) {
       setCloudStatus(`地点库同步失败：${error.message}`, true);
       setAccountFeedback(`地点库同步失败：${error.message}`, true);
@@ -146,19 +179,38 @@ async function syncPlaceLibraryToCloud(options = {}) {
 
 async function reconcilePlaceLibraryWithCloud() {
   const cloudPlaces = getCloudPlaceLibrarySnapshot();
-  const localPlaces = clonePlaceCollection(placeLibraryState);
-  const mergedPlaces = mergePlaceCollections(localPlaces, cloudPlaces);
-  const shouldUpdateLocal = !arePlaceCollectionsEqual(localPlaces, mergedPlaces);
-  const shouldUpdateCloud = !arePlaceCollectionsEqual(cloudPlaces, mergedPlaces);
+  const guestPlaces = loadGuestPlaceLibrary();
+  const guestFingerprint = buildPlaceLibraryFingerprint(guestPlaces);
+  const shouldImportGuestPlaces = Boolean(
+    guestPlaces.length &&
+    guestFingerprint &&
+    !hasGuestPlaceLibraryMigrationRecord(authSession?.user?.id, guestFingerprint)
+  );
+  const nextPlaces = shouldImportGuestPlaces
+    ? mergePlaceCollections(cloudPlaces, guestPlaces)
+    : cloudPlaces;
+  const shouldUpdateCloud = !arePlaceCollectionsEqual(cloudPlaces, nextPlaces);
 
-  if (shouldUpdateLocal) {
-    replacePlaceLibrary(mergedPlaces);
-    saveState(false);
-  }
+  replacePlaceLibrary(nextPlaces);
+  saveState(false);
   if (shouldUpdateCloud) {
-    await syncPlaceLibraryToCloud({ silent: true, rethrow: true });
+    await persistPlaceLibraryToCloud(nextPlaces, { silent: true });
+  } else {
+    setPlaceLibraryCloudStatus({
+      mode: "cloud",
+      phase: "idle",
+      detail: "",
+      lastSyncedAt: getCloudPlaceLibrarySyncedAt()
+    });
+    if (typeof refreshPlaceLibraryPanels === "function") refreshPlaceLibraryPanels();
   }
-  return mergedPlaces;
+  if (shouldImportGuestPlaces) {
+    markGuestPlaceLibraryMigrated(authSession?.user?.id, guestFingerprint);
+    if (shouldUpdateCloud) {
+      setAccountFeedback("已把当前浏览器中的游客地点库并入当前账号云端。");
+    }
+  }
+  return nextPlaces;
 }
 
 async function loadMyPlans() {
@@ -251,6 +303,7 @@ async function handleLogout() {
     const { error } = await supabaseClient.auth.signOut();
     if (error) throw error;
     setCurrentPlanMeta("", "");
+    setActivePage(PAGES.home);
     setAccountFeedback("已退出登录。");
   } catch (error) {
     setAccountFeedback(`退出失败：${error.message}`, true);

@@ -156,9 +156,9 @@ function renderAuthPanels() {
   els.profileDisplayName.textContent = displayName;
   els.profileEmail.textContent = authSession.user.email || "-";
   els.profilePlanCount.textContent = String(myPlans.length);
-  els.profileState.textContent = "已登录";
+  els.profileState.textContent = "已登录 · 地点库云端";
   els.brandProfileName.textContent = displayName;
-  els.brandProfileStatus.textContent = "已登录";
+  els.brandProfileStatus.textContent = "已登录 · 云端";
   els.brandProfileStatus.classList.remove("archived");
   els.brandProfileEmail.textContent = authSession.user.email || "-";
   els.brandProfilePlanCount.textContent = String(myPlans.length);
@@ -597,10 +597,21 @@ function renderPlaceLibraryStats() {
   els.placeLibraryStatPlay.textContent = String(playCount);
   els.placeLibraryStatFood.textContent = String(foodCount);
   els.placeLibraryStatStay.textContent = String(stayCount);
-  els.placeLibraryCount.textContent = `${placeLibraryState.length} 个地点`;
+  els.placeLibraryCount.textContent = `${placeLibraryState.length} 个地点 · ${authSession?.user ? "云端" : "本地"}`;
   if (els.profileHubPlaceCount) {
     els.profileHubPlaceCount.textContent = String(placeLibraryState.length);
   }
+}
+
+function getPlaceLibraryStorageSummary() {
+  if (!hasSupabaseConfig()) return "未配置云端，当前仅浏览器本地保存";
+  if (!authSession?.user) return "游客模式下保存在当前浏览器";
+  if (placeLibraryCloudStatus.phase === "error") {
+    return `账号云端同步失败：${placeLibraryCloudStatus.detail || "请稍后重试"}`;
+  }
+  if (placeLibraryCloudStatus.phase === "syncing") return "账号云端同步中...";
+  const syncedAt = getPlaceLibraryLastSyncedAt();
+  return syncedAt ? `账号云端已同步 ${formatSocialTime(syncedAt)}` : "账号云端已连接";
 }
 
 function renderPlaceLibraryList() {
@@ -609,9 +620,12 @@ function renderPlaceLibraryList() {
   renderPlaceLibraryStats();
   const places = getFilteredPlaceLibraryPlaces();
   els.placeLibraryEmpty.hidden = places.length > 0;
-  els.placeLibrarySummary.textContent = placeLibraryNotice
-    ? `当前显示 ${places.length} 个地点，共 ${placeLibraryState.length} 个 · ${placeLibraryNotice}`
-    : `当前显示 ${places.length} 个地点，共 ${placeLibraryState.length} 个`;
+  const summaryParts = [
+    `当前显示 ${places.length} 个地点，共 ${placeLibraryState.length} 个`,
+    getPlaceLibraryStorageSummary()
+  ];
+  if (placeLibraryNotice) summaryParts.push(placeLibraryNotice);
+  els.placeLibrarySummary.textContent = summaryParts.filter(Boolean).join(" · ");
   if (!places.length) return;
   places.forEach((place) => {
     const article = document.createElement("article");

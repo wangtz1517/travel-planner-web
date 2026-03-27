@@ -4,6 +4,7 @@ var AUTH_VIEW_STORAGE_KEY = "gopace_auth_view";
 var CURRENT_PLAN_STORAGE_KEY = "gopace_current_plan_id";
 var GUEST_DRAFT_MIGRATION_STORAGE_KEY = "gopace_guest_draft_migration";
 var PLAN_LIBRARY_META_STORAGE_KEY = "gopace_plan_library_meta";
+var SOCIAL_STORAGE_KEY = "gopace_social_v1";
 
 var PLACE_TYPES = ["起点", "终点", "景点", "途径点", "饭店", "酒店", "交通枢纽", "购物", "休闲", "备用"];
 var PLACE_LIBRARY_CATEGORIES = [
@@ -28,8 +29,64 @@ var TRANSPORT_MODES = [
 var STAY_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
 var ROUTE_SERVICE_MODES = new Set(["walk", "taxi", "drive", "transit", "bike"]);
 var SUGGESTION_LIMIT = 10;
-var PAGES = { home: "home", placeLibrary: "placeLibrary", planner: "planner", profile: "profile" };
+var PAGES = { home: "home", placeLibrary: "placeLibrary", planner: "planner", community: "community", profile: "profile" };
 var AUTH_VIEWS = { register: "register", login: "login" };
+var SOCIAL_DIRECTORY = [
+  {
+    id: "lumi",
+    name: "露米",
+    handle: "@lumi_routes",
+    email: "lumi@gopace.cn",
+    city: "杭州",
+    note: "偏爱展览、步行和咖啡馆路线。",
+    tags: ["城市漫游", "展览"]
+  },
+  {
+    id: "anson",
+    name: "安森",
+    handle: "@anson_drive",
+    email: "anson@gopace.cn",
+    city: "成都",
+    note: "擅长自驾节奏和多城串联。",
+    tags: ["自驾", "多城"]
+  },
+  {
+    id: "mika",
+    name: "Mika",
+    handle: "@mika_foodie",
+    email: "mika@gopace.cn",
+    city: "上海",
+    note: "会补餐厅、夜生活和雨天备选。",
+    tags: ["美食", "夜生活"]
+  },
+  {
+    id: "nora",
+    name: "Nora",
+    handle: "@nora_archives",
+    email: "nora@gopace.cn",
+    city: "北京",
+    note: "喜欢把每次旅行整理成精致归档。",
+    tags: ["归档", "摄影"]
+  },
+  {
+    id: "kevin",
+    name: "Kevin",
+    handle: "@kevin_weekend",
+    email: "kevin@gopace.cn",
+    city: "深圳",
+    note: "更适合周末短途和轻量行程。",
+    tags: ["周末", "轻量"]
+  },
+  {
+    id: "yuki",
+    name: "Yuki",
+    handle: "@yuki_stay",
+    email: "yuki@gopace.cn",
+    city: "大阪",
+    note: "对酒店、温泉和落脚点很有经验。",
+    tags: ["住宿", "温泉"]
+  }
+];
 
 var els = {
   homeGrid: document.getElementById("homeGrid"),
@@ -45,12 +102,19 @@ var els = {
   navHomeBtn: document.getElementById("navHomeBtn"),
   navPlaceLibraryBtn: document.getElementById("navPlaceLibraryBtn"),
   navPlannerBtn: document.getElementById("navPlannerBtn"),
+  navCommunityBtn: document.getElementById("navCommunityBtn"),
   navProfileBtn: document.getElementById("navProfileBtn"),
   authBadge: document.getElementById("authBadge"),
   homeAuthBadge: document.getElementById("homeAuthBadge"),
   homePage: document.getElementById("homePage"),
+  homeOverviewCard: document.getElementById("homeOverviewCard"),
+  homeMasthead: document.getElementById("homeMasthead"),
+  homeStageLibraryAction: document.getElementById("homeStageLibraryAction"),
+  homeStagePlannerAction: document.getElementById("homeStagePlannerAction"),
+  homeStageFootprintAction: document.getElementById("homeStageFootprintAction"),
   placeLibraryPage: document.getElementById("placeLibraryPage"),
   plannerPage: document.getElementById("plannerPage"),
+  communityPage: document.getElementById("communityPage"),
   profilePage: document.getElementById("profilePage"),
   supabaseConfigNotice: document.getElementById("supabaseConfigNotice"),
   authGuestPanel: document.getElementById("authGuestPanel"),
@@ -76,8 +140,6 @@ var els = {
   goPlannerBtn: document.getElementById("goPlannerBtn"),
   homeOverviewBadge: document.getElementById("homeOverviewBadge"),
   homeOverviewText: document.getElementById("homeOverviewText"),
-  homeOpenPlannerBtn: document.getElementById("homeOpenPlannerBtn"),
-  homeOpenProfileBtn: document.getElementById("homeOpenProfileBtn"),
   homeMiniLibraryBtn: document.getElementById("homeMiniLibraryBtn"),
   homeMetricPlans: document.getElementById("homeMetricPlans"),
   homeMetricArchived: document.getElementById("homeMetricArchived"),
@@ -102,8 +164,6 @@ var els = {
   footprintProvinceList: document.getElementById("footprintProvinceList"),
   footprintProvinceEmpty: document.getElementById("footprintProvinceEmpty"),
   footprintRankingList: document.getElementById("footprintRankingList"),
-  placeLibraryOpenPlannerBtn: document.getElementById("placeLibraryOpenPlannerBtn"),
-  placeLibraryOpenProfileBtn: document.getElementById("placeLibraryOpenProfileBtn"),
   placeLibraryStatAll: document.getElementById("placeLibraryStatAll"),
   placeLibraryStatPlay: document.getElementById("placeLibraryStatPlay"),
   placeLibraryStatFood: document.getElementById("placeLibraryStatFood"),
@@ -123,6 +183,25 @@ var els = {
   profileHubEmail: document.getElementById("profileHubEmail"),
   profileHubPlaceCount: document.getElementById("profileHubPlaceCount"),
   profileHubArchivedCount: document.getElementById("profileHubArchivedCount"),
+  socialModeBadge: document.getElementById("socialModeBadge"),
+  socialFriendCount: document.getElementById("socialFriendCount"),
+  socialRequestCount: document.getElementById("socialRequestCount"),
+  socialUnreadCount: document.getElementById("socialUnreadCount"),
+  socialShareCount: document.getElementById("socialShareCount"),
+  socialNetworkHint: document.getElementById("socialNetworkHint"),
+  socialSearchInput: document.getElementById("socialSearchInput"),
+  socialQuickAddBtn: document.getElementById("socialQuickAddBtn"),
+  socialDiscoveryList: document.getElementById("socialDiscoveryList"),
+  socialRequestList: document.getElementById("socialRequestList"),
+  socialFriendList: document.getElementById("socialFriendList"),
+  socialConversationTabs: document.getElementById("socialConversationTabs"),
+  socialConversationTitle: document.getElementById("socialConversationTitle"),
+  socialConversationMeta: document.getElementById("socialConversationMeta"),
+  socialConversationFeed: document.getElementById("socialConversationFeed"),
+  socialMessageInput: document.getElementById("socialMessageInput"),
+  socialSendMessageBtn: document.getElementById("socialSendMessageBtn"),
+  socialSharePlanBtn: document.getElementById("socialSharePlanBtn"),
+  socialShareFeed: document.getElementById("socialShareFeed"),
   logoutBtn: document.getElementById("logoutBtn"),
   refreshPlansBtn: document.getElementById("refreshPlansBtn"),
   createBlankPlanBtn: document.getElementById("createBlankPlanBtn"),
@@ -144,18 +223,16 @@ var els = {
   homePlanEmpty: document.getElementById("libraryPlanEmpty"),
   currentPlanLabel: document.getElementById("currentPlanLabel"),
   saveCloudBtn: document.getElementById("saveCloudBtn"),
-  openPlaceLibraryBtn: document.getElementById("openPlaceLibraryBtn"),
-  openProfileBtn: document.getElementById("openProfileBtn"),
-  plannerOpenPlaceLibraryBtn: document.getElementById("plannerOpenPlaceLibraryBtn"),
   cloudStatus: document.getElementById("cloudStatus"),
   plannerPlaceSearchInput: document.getElementById("plannerPlaceSearchInput"),
   plannerPlaceCategorySelect: document.getElementById("plannerPlaceCategorySelect"),
   tripName: document.getElementById("tripName"),
   travelerCount: document.getElementById("travelerCount"),
+  tripDateRangeBtn: document.getElementById("tripDateRangeBtn"),
+  tripDateRangeValue: document.getElementById("tripDateRangeValue"),
+  tripDatePicker: document.getElementById("tripDatePicker"),
   startDate: document.getElementById("startDate"),
   endDate: document.getElementById("endDate"),
-  generateDaysBtn: document.getElementById("generateDaysBtn"),
-  saveBtn: document.getElementById("saveBtn"),
   exportBtn: document.getElementById("exportBtn"),
   resetBtn: document.getElementById("resetBtn"),
   saveStatus: document.getElementById("saveStatus"),
@@ -179,6 +256,8 @@ var els = {
 };
 
 var state = loadState();
+var placeLibraryState = normalizePlaceCollection(state.places);
+state.places = clonePlaceCollection(placeLibraryState);
 var selectedDayId = state.days[0]?.id || "";
 var activePage = loadStoredValue(PAGE_STORAGE_KEY, PAGES.home);
 var authView = loadStoredValue(AUTH_VIEW_STORAGE_KEY, AUTH_VIEWS.register);
@@ -200,6 +279,8 @@ var footprintProvinceLayer = null;
 var footprintMarkers = [];
 var footprintRenderToken = 0;
 var districtLookupCache = new Map();
+var tripDateRangeDraftStart = "";
+var tripDateRangeSelectionStep = "start";
 var footprintInfoWindow = null;
 var activeFootprintProvinceCode = "";
 var hoveredFootprintProvinceCode = "";
@@ -257,6 +338,10 @@ var placeLibrarySearchQuery = "";
 var plannerPlaceSearchQuery = "";
 var plannerPlaceFilter = "all";
 var placeLibraryNotice = "";
+var socialScopeKey = "";
+var socialSearchQuery = "";
+var selectedConversationId = "";
+var socialState = createDefaultSocialState();
 
 function loadStoredValue(key, fallback = "") {
   try {
@@ -327,23 +412,35 @@ function toNumberOrNull(value) {
   return null;
 }
 
+function normalizePlaceEntry(place) {
+  return {
+    id: place?.id || uid("place"),
+    name: place?.name || "未命名地点",
+    category: place?.category || "other",
+    province: place?.province || "",
+    city: place?.city || "",
+    district: place?.district || "",
+    address: place?.address || "",
+    lng: toNumberOrNull(place?.lng),
+    lat: toNumberOrNull(place?.lat),
+    poiId: place?.poiId || "",
+    sourceKey: place?.sourceKey || ""
+  };
+}
+
+function normalizePlaceCollection(places) {
+  return Array.isArray(places) ? places.map((place) => normalizePlaceEntry(place)) : [];
+}
+
+function clonePlaceCollection(places) {
+  return normalizePlaceCollection(places);
+}
+
 function normalizeState(raw) {
   const base = createDefaultState();
   const next = { ...base, ...(raw || {}) };
   next.trip = ensureTripDates({ ...base.trip, ...(next.trip || {}) });
-  next.places = Array.isArray(next.places) ? next.places.map((place) => ({
-    id: place.id || uid("place"),
-    name: place.name || "未命名地点",
-    category: place.category || "other",
-    province: place.province || "",
-    city: place.city || "",
-    district: place.district || "",
-    address: place.address || "",
-    lng: toNumberOrNull(place.lng),
-    lat: toNumberOrNull(place.lat),
-    poiId: place.poiId || "",
-    sourceKey: place.sourceKey || ""
-  })) : [];
+  next.places = normalizePlaceCollection(next.places);
   next.days = Array.isArray(next.days) ? next.days.map((day, dayIndex) => ({
     id: day.id || uid("day"),
     title: day.title || `Day ${dayIndex + 1}`,
@@ -402,14 +499,133 @@ function syncTripInputsToState() {
 }
 
 function syncStateToTripInputs() {
+  resetTripDateRangeSelection();
   state.trip = ensureTripDates(state.trip);
   els.tripName.value = state.trip.name || "";
   els.travelerCount.value = state.trip.travelers || 1;
   els.startDate.value = state.trip.startDate;
   els.endDate.value = state.trip.endDate;
+  renderTripDateRangeControl();
+}
+
+function resetTripDateRangeSelection() {
+  tripDateRangeDraftStart = "";
+  tripDateRangeSelectionStep = "start";
+  if (els.tripDatePicker) {
+    els.tripDatePicker.min = "";
+  }
+}
+
+function renderTripDateRangeControl() {
+  if (!els.tripDateRangeValue || !els.tripDateRangeBtn) return;
+  const safeTrip = ensureTripDates(state.trip);
+  els.tripDateRangeValue.textContent = formatPlanDateRange(safeTrip.startDate, safeTrip.endDate);
+  if (tripDateRangeSelectionStep === "end" && tripDateRangeDraftStart) {
+    els.tripDateRangeBtn.dataset.selectionStep = "end";
+    els.tripDateRangeBtn.setAttribute("aria-label", `开始日期已选 ${tripDateRangeDraftStart}，请继续选择结束日期`);
+  } else {
+    els.tripDateRangeBtn.dataset.selectionStep = "start";
+    els.tripDateRangeBtn.setAttribute("aria-label", "选择行程日期范围");
+  }
+}
+
+function openTripDateRangePicker() {
+  if (!els.tripDatePicker) return;
+  const safeTrip = ensureTripDates(state.trip);
+  if (tripDateRangeSelectionStep === "end" && tripDateRangeDraftStart) {
+    els.tripDatePicker.min = tripDateRangeDraftStart;
+    els.tripDatePicker.value = safeTrip.endDate && safeTrip.endDate >= tripDateRangeDraftStart
+      ? safeTrip.endDate
+      : tripDateRangeDraftStart;
+  } else {
+    resetTripDateRangeSelection();
+    els.tripDatePicker.min = "";
+    els.tripDatePicker.value = safeTrip.startDate || getTodayIso();
+  }
+  if (typeof els.tripDatePicker.showPicker === "function") {
+    els.tripDatePicker.showPicker();
+    return;
+  }
+  els.tripDatePicker.focus();
+}
+
+function handleTripDateRangePick() {
+  if (!els.tripDatePicker) return;
+  const pickedDate = els.tripDatePicker.value;
+  if (!pickedDate) return;
+
+  if (tripDateRangeSelectionStep === "start") {
+    tripDateRangeDraftStart = pickedDate;
+    tripDateRangeSelectionStep = "end";
+    els.startDate.value = pickedDate;
+    els.endDate.value = pickedDate;
+    syncTripInputsToState();
+    saveState(false);
+    renderPlannerMeta();
+    renderTripDateRangeControl();
+    els.tripDatePicker.min = pickedDate;
+    els.tripDatePicker.value = state.trip.endDate && state.trip.endDate >= pickedDate ? state.trip.endDate : pickedDate;
+    if (typeof els.tripDatePicker.showPicker === "function") {
+      setTimeout(() => {
+        if (tripDateRangeSelectionStep === "end") els.tripDatePicker.showPicker();
+      }, 30);
+    }
+    return;
+  }
+
+  els.startDate.value = tripDateRangeDraftStart || pickedDate;
+  els.endDate.value = pickedDate;
+  resetTripDateRangeSelection();
+  syncTripInputsToState();
+  generateDays();
+}
+
+function replacePlaceLibrary(nextPlaces) {
+  placeLibraryState = normalizePlaceCollection(nextPlaces);
+  state.places = clonePlaceCollection(placeLibraryState);
+  return state.places;
+}
+
+function buildPlaceLibraryMergeKey(place) {
+  const normalized = normalizePlaceEntry(place);
+  if (normalized.sourceKey) return `source:${normalizePlanText(normalized.sourceKey)}`;
+  if (normalized.poiId) return `poi:${normalizePlanText(normalized.poiId)}`;
+  const geo = normalized.lng != null && normalized.lat != null
+    ? `|geo:${normalized.lng.toFixed(6)},${normalized.lat.toFixed(6)}`
+    : "";
+  return [
+    "name",
+    normalizePlanText(normalized.name),
+    normalizePlanText(normalized.province),
+    normalizePlanText(normalized.city),
+    normalizePlanText(normalized.district),
+    normalizePlanText(normalized.address)
+  ].join(":") + geo;
+}
+
+function mergePlaceCollections(...collections) {
+  const merged = [];
+  const seenIds = new Set();
+  const seenKeys = new Set();
+  collections.forEach((collection) => {
+    normalizePlaceCollection(collection).forEach((place) => {
+      const mergeKey = buildPlaceLibraryMergeKey(place);
+      if (seenIds.has(place.id)) return;
+      if (mergeKey && seenKeys.has(mergeKey)) return;
+      seenIds.add(place.id);
+      if (mergeKey) seenKeys.add(mergeKey);
+      merged.push(place);
+    });
+  });
+  return merged;
+}
+
+function arePlaceCollectionsEqual(left, right) {
+  return JSON.stringify(normalizePlaceCollection(left)) === JSON.stringify(normalizePlaceCollection(right));
 }
 
 function saveState(showStatus = true) {
+  state.places = clonePlaceCollection(placeLibraryState);
   syncTripInputsToState();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   if (showStatus) {
@@ -484,6 +700,387 @@ function persistStoredJson(key, value) {
   } catch {
     // Ignore storage write failures and keep the app usable.
   }
+}
+
+function getSocialScopeKey() {
+  return authSession?.user?.id || "guest";
+}
+
+function normalizeSocialMessage(message) {
+  return {
+    id: message?.id || uid("social_message"),
+    sender: message?.sender || "system",
+    type: message?.type || "text",
+    text: message?.text || "",
+    planId: message?.planId || "",
+    planTitle: message?.planTitle || "",
+    createdAt: message?.createdAt || new Date().toISOString()
+  };
+}
+
+function normalizeSocialConversation(conversation) {
+  return {
+    id: conversation?.id || uid("social_conversation"),
+    participantId: conversation?.participantId || "",
+    unreadCount: Math.max(0, Number(conversation?.unreadCount || 0)),
+    messages: Array.isArray(conversation?.messages)
+      ? conversation.messages.map((message) => normalizeSocialMessage(message))
+      : []
+  };
+}
+
+function normalizeSocialState(raw) {
+  const next = raw && typeof raw === "object" ? raw : {};
+  return {
+    friends: Array.isArray(next.friends)
+      ? next.friends.map((friend) => ({
+          profileId: friend?.profileId || "",
+          connectedAt: friend?.connectedAt || new Date().toISOString()
+        })).filter((friend) => friend.profileId)
+      : [],
+    requests: Array.isArray(next.requests)
+      ? next.requests.map((request) => ({
+          id: request?.id || uid("friend_request"),
+          profileId: request?.profileId || "",
+          direction: request?.direction === "outgoing" ? "outgoing" : "incoming",
+          message: request?.message || "",
+          createdAt: request?.createdAt || new Date().toISOString()
+        })).filter((request) => request.profileId)
+      : [],
+    conversations: Array.isArray(next.conversations)
+      ? next.conversations.map((conversation) => normalizeSocialConversation(conversation)).filter((conversation) => conversation.participantId)
+      : [],
+    shares: Array.isArray(next.shares)
+      ? next.shares.map((share) => ({
+          id: share?.id || uid("social_share"),
+          participantId: share?.participantId || "",
+          direction: share?.direction === "received" ? "received" : "sent",
+          planId: share?.planId || "",
+          planTitle: share?.planTitle || "",
+          note: share?.note || "",
+          createdAt: share?.createdAt || new Date().toISOString()
+        })).filter((share) => share.participantId)
+      : []
+  };
+}
+
+function createDefaultSocialState() {
+  return normalizeSocialState({
+    friends: [
+      { profileId: "lumi", connectedAt: "2026-03-18T10:20:00.000Z" },
+      { profileId: "anson", connectedAt: "2026-03-16T08:10:00.000Z" },
+      { profileId: "mika", connectedAt: "2026-03-14T13:30:00.000Z" }
+    ],
+    requests: [
+      { profileId: "nora", direction: "incoming", message: "我也在整理足迹，想和你交换路线灵感。", createdAt: "2026-03-26T09:12:00.000Z" },
+      { profileId: "kevin", direction: "outgoing", message: "想约你一起做周末短途路线。", createdAt: "2026-03-25T18:40:00.000Z" }
+    ],
+    conversations: [
+      {
+        participantId: "lumi",
+        unreadCount: 2,
+        messages: [
+          { sender: "lumi", type: "text", text: "下周那条城市漫游线，我觉得上午先逛展会更顺。", createdAt: "2026-03-26T08:40:00.000Z" },
+          { sender: "me", type: "text", text: "可以，我再把午饭和咖啡馆插进去。", createdAt: "2026-03-26T08:48:00.000Z" },
+          { sender: "lumi", type: "text", text: "你改好之后再发我，我帮你看动线。", createdAt: "2026-03-26T09:03:00.000Z" }
+        ]
+      },
+      {
+        participantId: "anson",
+        unreadCount: 0,
+        messages: [
+          { sender: "me", type: "share", text: "把上次那条川西自驾线发你了，看看节奏还顺不顺。", planTitle: "川西自驾试跑线", createdAt: "2026-03-25T20:15:00.000Z" },
+          { sender: "anson", type: "text", text: "收到，我晚点帮你补两个中转休息点。", createdAt: "2026-03-25T20:24:00.000Z" }
+        ]
+      },
+      {
+        participantId: "mika",
+        unreadCount: 1,
+        messages: [
+          { sender: "mika", type: "text", text: "你东京那条路线里，晚餐可以换成中目黑那家烤鸡店。", createdAt: "2026-03-27T07:55:00.000Z" }
+        ]
+      }
+    ],
+    shares: [
+      { participantId: "anson", direction: "sent", planTitle: "川西自驾试跑线", note: "想请他帮忙看看长距离驾驶节奏。", createdAt: "2026-03-25T20:15:00.000Z" },
+      { participantId: "lumi", direction: "received", planTitle: "苏州周末慢游", note: "她发来一条两天一夜的轻步行路线。", createdAt: "2026-03-24T19:05:00.000Z" }
+    ]
+  });
+}
+
+function loadSocialStore() {
+  return loadStoredJson(SOCIAL_STORAGE_KEY, {});
+}
+
+function persistSocialStore(store) {
+  persistStoredJson(SOCIAL_STORAGE_KEY, store || {});
+}
+
+function loadSocialStateForScope(scopeKey = getSocialScopeKey()) {
+  const store = loadSocialStore();
+  const scoped = store[scopeKey];
+  return normalizeSocialState(scoped || createDefaultSocialState());
+}
+
+function persistSocialState() {
+  socialState = normalizeSocialState(socialState);
+  const store = loadSocialStore();
+  store[getSocialScopeKey()] = socialState;
+  persistSocialStore(store);
+  return socialState;
+}
+
+function ensureSelectedSocialConversation() {
+  const conversations = Array.isArray(socialState?.conversations) ? socialState.conversations : [];
+  if (conversations.some((conversation) => conversation.id === selectedConversationId)) return;
+  selectedConversationId = conversations[0]?.id || "";
+}
+
+function syncSocialStateScope() {
+  const nextScopeKey = getSocialScopeKey();
+  if (socialScopeKey === nextScopeKey) {
+    ensureSelectedSocialConversation();
+    return socialState;
+  }
+  socialScopeKey = nextScopeKey;
+  socialState = loadSocialStateForScope(nextScopeKey);
+  ensureSelectedSocialConversation();
+  return socialState;
+}
+
+function getSocialProfile(profileId) {
+  const profile = SOCIAL_DIRECTORY.find((item) => item.id === profileId);
+  return profile || {
+    id: profileId,
+    name: "未命名好友",
+    handle: "@pending",
+    email: "",
+    city: "",
+    note: "",
+    tags: []
+  };
+}
+
+function getSocialConversationByParticipant(profileId) {
+  syncSocialStateScope();
+  return socialState.conversations.find((conversation) => conversation.participantId === profileId) || null;
+}
+
+function ensureSocialConversation(profileId) {
+  syncSocialStateScope();
+  let conversation = getSocialConversationByParticipant(profileId);
+  if (conversation) return conversation;
+  conversation = normalizeSocialConversation({
+    participantId: profileId,
+    unreadCount: 0,
+    messages: [
+      {
+        sender: "system",
+        type: "system",
+        text: "现在可以在这里讨论路线、预算和集合安排了。"
+      }
+    ]
+  });
+  socialState.conversations.unshift(conversation);
+  persistSocialState();
+  ensureSelectedSocialConversation();
+  return conversation;
+}
+
+function getSocialFriends() {
+  syncSocialStateScope();
+  return socialState.friends
+    .map((friend) => ({
+      ...friend,
+      profile: getSocialProfile(friend.profileId),
+      conversation: getSocialConversationByParticipant(friend.profileId)
+    }))
+    .sort((left, right) => {
+      const leftTime = new Date(left.conversation?.messages?.slice(-1)[0]?.createdAt || left.connectedAt).getTime();
+      const rightTime = new Date(right.conversation?.messages?.slice(-1)[0]?.createdAt || right.connectedAt).getTime();
+      return rightTime - leftTime;
+    });
+}
+
+function getSocialRequests(direction = "") {
+  syncSocialStateScope();
+  return socialState.requests
+    .filter((request) => !direction || request.direction === direction)
+    .map((request) => ({ ...request, profile: getSocialProfile(request.profileId) }))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+}
+
+function getSocialConversations() {
+  syncSocialStateScope();
+  return socialState.conversations
+    .map((conversation) => ({
+      ...conversation,
+      profile: getSocialProfile(conversation.participantId)
+    }))
+    .sort((left, right) => {
+      const leftTime = new Date(left.messages.slice(-1)[0]?.createdAt || 0).getTime();
+      const rightTime = new Date(right.messages.slice(-1)[0]?.createdAt || 0).getTime();
+      return rightTime - leftTime;
+    });
+}
+
+function getSocialShares() {
+  syncSocialStateScope();
+  return socialState.shares
+    .map((share) => ({ ...share, profile: getSocialProfile(share.participantId) }))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+}
+
+function getSocialDiscoveryResults() {
+  syncSocialStateScope();
+  const friendIds = new Set(socialState.friends.map((friend) => friend.profileId));
+  const requestIds = new Set(socialState.requests.map((request) => request.profileId));
+  const query = normalizePlanText(socialSearchQuery);
+  return SOCIAL_DIRECTORY
+    .filter((profile) => !friendIds.has(profile.id) && !requestIds.has(profile.id))
+    .filter((profile) => {
+      if (!query) return true;
+      return [
+        profile.name,
+        profile.handle,
+        profile.email,
+        profile.city,
+        profile.note,
+        ...(Array.isArray(profile.tags) ? profile.tags : [])
+      ].some((field) => normalizePlanText(field).includes(query));
+    })
+    .slice(0, 4);
+}
+
+function setSocialSearchQuery(query) {
+  socialSearchQuery = String(query || "").trim();
+}
+
+function hasSocialFriend(profileId) {
+  syncSocialStateScope();
+  return socialState.friends.some((friend) => friend.profileId === profileId);
+}
+
+function hasPendingSocialRequest(profileId) {
+  syncSocialStateScope();
+  return socialState.requests.some((request) => request.profileId === profileId);
+}
+
+function sendFriendRequest(profileId) {
+  syncSocialStateScope();
+  if (!profileId || hasSocialFriend(profileId) || hasPendingSocialRequest(profileId)) return false;
+  socialState.requests.unshift({
+    id: uid("friend_request"),
+    profileId,
+    direction: "outgoing",
+    message: "想和你一起分享路线和旅行灵感。",
+    createdAt: new Date().toISOString()
+  });
+  persistSocialState();
+  return true;
+}
+
+function acceptFriendRequest(requestId) {
+  syncSocialStateScope();
+  const requestIndex = socialState.requests.findIndex((request) => request.id === requestId);
+  if (requestIndex < 0) return null;
+  const [request] = socialState.requests.splice(requestIndex, 1);
+  if (!socialState.friends.some((friend) => friend.profileId === request.profileId)) {
+    socialState.friends.unshift({
+      profileId: request.profileId,
+      connectedAt: new Date().toISOString()
+    });
+  }
+  const conversation = ensureSocialConversation(request.profileId);
+  conversation.messages.push(normalizeSocialMessage({
+    sender: "system",
+    type: "system",
+    text: "你们已经成为好友，现在可以互相分享行程了。"
+  }));
+  persistSocialState();
+  selectedConversationId = conversation.id;
+  return request.profileId;
+}
+
+function declineFriendRequest(requestId) {
+  syncSocialStateScope();
+  const requestIndex = socialState.requests.findIndex((request) => request.id === requestId);
+  if (requestIndex < 0) return null;
+  const [request] = socialState.requests.splice(requestIndex, 1);
+  persistSocialState();
+  return request.profileId;
+}
+
+function openSocialConversation(profileId) {
+  const conversation = ensureSocialConversation(profileId);
+  conversation.unreadCount = 0;
+  selectedConversationId = conversation.id;
+  persistSocialState();
+  return conversation;
+}
+
+function getSelectedSocialConversation() {
+  syncSocialStateScope();
+  ensureSelectedSocialConversation();
+  return socialState.conversations.find((conversation) => conversation.id === selectedConversationId) || null;
+}
+
+function sendSocialMessage(text) {
+  syncSocialStateScope();
+  const conversation = getSelectedSocialConversation();
+  const content = String(text || "").trim();
+  if (!conversation || !content) return false;
+  conversation.messages.push(normalizeSocialMessage({
+    sender: "me",
+    type: "text",
+    text: content,
+    createdAt: new Date().toISOString()
+  }));
+  persistSocialState();
+  return true;
+}
+
+function getDefaultSharePlan() {
+  if (currentPlanId) {
+    const currentPlan = myPlans.find((plan) => plan.id === currentPlanId);
+    if (currentPlan) return currentPlan;
+  }
+  if (hasMeaningfulPlanState(state)) {
+    return {
+      id: currentPlanId || "local-draft",
+      title: state.trip?.name?.trim() || "当前规划草稿"
+    };
+  }
+  return myPlans[0] || null;
+}
+
+function sharePlanWithFriend(profileId) {
+  syncSocialStateScope();
+  if (!hasSocialFriend(profileId)) return { ok: false, message: "只有已添加的好友才能分享行程。" };
+  const plan = getDefaultSharePlan();
+  if (!plan) return { ok: false, message: "当前还没有可分享的行程计划。" };
+  const conversation = ensureSocialConversation(profileId);
+  const planTitle = plan.title || "未命名旅行";
+  conversation.messages.push(normalizeSocialMessage({
+    sender: "me",
+    type: "share",
+    text: `分享给你一条行程：${planTitle}`,
+    planId: plan.id,
+    planTitle,
+    createdAt: new Date().toISOString()
+  }));
+  socialState.shares.unshift({
+    id: uid("social_share"),
+    participantId: profileId,
+    direction: "sent",
+    planId: plan.id,
+    planTitle,
+    note: "从个人页直接发起的路线分享。",
+    createdAt: new Date().toISOString()
+  });
+  selectedConversationId = conversation.id;
+  persistSocialState();
+  return { ok: true, planTitle, profileId };
 }
 
 function persistGuestDraftMigrationMap(migrationMap) {
@@ -664,7 +1261,7 @@ function getModeConfig(modeValue) {
 }
 
 function getPlaceById(placeId) {
-  return state.places.find((place) => place.id === placeId) || null;
+  return placeLibraryState.find((place) => place.id === placeId) || null;
 }
 
 function escapeHtml(value) {

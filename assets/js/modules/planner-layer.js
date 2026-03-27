@@ -14,6 +14,14 @@ function createTripItem(placeId, day) {
   };
 }
 
+function syncPlaceLibraryAfterMutation(successMessage = "") {
+  if (!authSession?.user || typeof syncPlaceLibraryToCloud !== "function") return;
+  void syncPlaceLibraryToCloud({
+    silent: !successMessage,
+    successMessage
+  });
+}
+
 function generateDays() {
   syncTripInputsToState();
   const { startDate, endDate } = state.trip;
@@ -64,11 +72,14 @@ function moveTripItem(fromDayId, itemId, toDayId, insertIndex = null) {
 }
 
 function removePlace(placeId) {
-  state.places = state.places.filter((place) => place.id !== placeId);
+  const removedPlace = getPlaceById(placeId);
+  replacePlaceLibrary(placeLibraryState.filter((place) => place.id !== placeId));
   state.days.forEach((day) => {
     day.items = day.items.filter((item) => item.placeId !== placeId);
   });
+  placeLibraryNotice = removedPlace ? `已从地点库移除：${removedPlace.name}` : "";
   recalculateAllDays();
+  syncPlaceLibraryAfterMutation(removedPlace ? `地点库已同步到云端：${removedPlace.name}` : "");
 }
 
 function removeItem(dayId, itemId) {
@@ -160,30 +171,24 @@ function inferPlaceLibraryCategory(item) {
 }
 
 function updatePlaceLibraryEntry(placeId, patch) {
-  const place = state.places.find((entry) => entry.id === placeId);
+  const place = placeLibraryState.find((entry) => entry.id === placeId);
   if (!place) return;
-  Object.assign(place, patch);
+  replacePlaceLibrary(placeLibraryState.map((entry) => (
+    entry.id === placeId ? { ...entry, ...patch } : entry
+  )));
+  placeLibraryNotice = `已更新地点：${place.name}`;
   saveState(false);
   renderAll();
+  syncPlaceLibraryAfterMutation(`地点库已同步到云端：${place.name}`);
 }
 
 function buildPlaceIdentityKey(entry) {
-  const poiId = normalizePlanText(entry?.poiId || "");
-  if (poiId) return `poi:${poiId}`;
-  const name = normalizePlanText(entry?.name || "");
-  const province = normalizePlanText(entry?.province || "");
-  const city = normalizePlanText(entry?.city || entry?.adcode || "");
-  const district = normalizePlanText(entry?.district || "");
-  const address = normalizePlanText(entry?.address || "");
-  const lng = toNumberOrNull(entry?.lng ?? entry?.location?.lng);
-  const lat = toNumberOrNull(entry?.lat ?? entry?.location?.lat);
-  const geo = lng != null && lat != null ? `|geo:${lng.toFixed(6)},${lat.toFixed(6)}` : "";
-  return `name:${name}|province:${province}|city:${city}|district:${district}|address:${address}${geo}`;
+  return buildPlaceLibraryMergeKey(entry);
 }
 
 function findDuplicatePlace(item) {
   const itemKey = buildPlaceIdentityKey(item);
-  return state.places.find((place) => buildPlaceIdentityKey(place) === itemKey) || null;
+  return placeLibraryState.find((place) => buildPlaceIdentityKey(place) === itemKey) || null;
 }
 
 function getDayDiagnostics(day, stats = getDayStats(day)) {
@@ -358,7 +363,7 @@ function addPlaceFromSuggestion(item) {
     return;
   }
   const nextPlaceName = item.name || "未命名地点";
-  state.places.push({
+  replacePlaceLibrary([...placeLibraryState, {
     id: uid("place"),
     name: nextPlaceName,
     category: inferPlaceLibraryCategory(item),
@@ -370,7 +375,7 @@ function addPlaceFromSuggestion(item) {
     lat: item.location?.lat ?? null,
     poiId: item.id || "",
     sourceKey: buildPlaceIdentityKey(item)
-  });
+  }]);
   placeLibraryFilter = "all";
   placeLibrarySearchQuery = "";
   placeLibraryNotice = `已加入地点库：${nextPlaceName}`;
@@ -379,4 +384,5 @@ function addPlaceFromSuggestion(item) {
   removeSuggestionFromList(item);
   renderSuggestions();
   refreshPlaceLibraryPanels();
+  syncPlaceLibraryAfterMutation(`地点库已同步到云端：${nextPlaceName}`);
 }

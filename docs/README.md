@@ -22,6 +22,8 @@
   Supabase 架构、Auth、数据库初始化与接入说明
 - `docs/backend/sql/001-save-trip-plan.sql`
   云端保存旅行计划所需的 Supabase RPC SQL 脚本
+- `docs/backend/sql/002-profile-place-library.sql`
+  为账号资料补充地点库云端快照字段，用于登录后回读和同步地点库
 
 ## 命名规范
 

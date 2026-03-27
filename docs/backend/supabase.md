@@ -332,3 +332,117 @@ window.APP_CONFIG = {
 - 复杂聚合统计
 
 在那之前，Supabase 本身就足够支撑当前阶段产品。
+
+## 10. 地点库云端同步补充（2026-03-27）
+
+- `profiles.place_library_snapshot` 用于存放账号级地点库云端快照，字段类型为 `jsonb`，默认值为空数组。
+- 前端登录后会先读取当前账号的 `place_library_snapshot`，再与本地地点库合并，避免覆盖用户已收藏的地点。
+- 登录前已在本地加入的地点，会在登录后自动并入当前账号的云端地点库，后续在同一账号下重新登录仍可直接看到。
+- 地点库中的新增、删除和分类调整会直接回写到 `profiles.place_library_snapshot`，不再只停留在本地 `localStorage`。
+- 上线前需要先在 Supabase SQL Editor 执行 `docs/backend/sql/002-profile-place-library.sql`。
+
+## 11. 好友中心后端预留（2026-03-27）
+
+当前好友能力首轮先以前端本地持久化验证加好友、私信和行程分享链路，后续如果要升级为跨设备可用的正式能力，建议在 Supabase 中拆成下面几组表，而不是继续塞进 `profiles` 的大字段快照里。
+
+### 11.1 建议表结构
+
+#### A. `friend_requests`
+
+- 用途：
+  - 存放好友申请
+- 核心字段建议：
+  - `id uuid primary key`
+  - `sender_id uuid not null references public.profiles(id)`
+  - `receiver_id uuid not null references public.profiles(id)`
+  - `message text default ''`
+  - `status text not null default 'pending'`
+  - `created_at timestamptz not null default now()`
+  - `updated_at timestamptz not null default now()`
+- 约束建议：
+  - 同一对用户在 `pending` 状态下只允许一条有效申请
+
+#### B. `friendships`
+
+- 用途：
+  - 存放已经建立的好友关系
+- 核心字段建议：
+  - `id uuid primary key`
+  - `user_a uuid not null references public.profiles(id)`
+  - `user_b uuid not null references public.profiles(id)`
+  - `created_at timestamptz not null default now()`
+- 约束建议：
+  - `user_a <> user_b`
+  - 通过排序后的唯一索引保证一对好友只存在一条关系记录
+
+#### C. `direct_threads`
+
+- 用途：
+  - 存放一对一私信会话
+- 核心字段建议：
+  - `id uuid primary key`
+  - `user_a uuid not null references public.profiles(id)`
+  - `user_b uuid not null references public.profiles(id)`
+  - `last_message_at timestamptz`
+  - `created_at timestamptz not null default now()`
+- 约束建议：
+  - 使用排序后的唯一索引防止同一对用户重复建线程
+
+#### D. `direct_messages`
+
+- 用途：
+  - 存放私信消息
+- 核心字段建议：
+  - `id uuid primary key`
+  - `thread_id uuid not null references public.direct_threads(id) on delete cascade`
+  - `sender_id uuid references public.profiles(id)`
+  - `message_type text not null default 'text'`
+  - `body text default ''`
+  - `plan_id uuid references public.trip_plans(id)`
+  - `plan_title_snapshot text default ''`
+  - `created_at timestamptz not null default now()`
+- 说明：
+  - `message_type` 首轮至少支持 `text / system / share`
+  - `plan_title_snapshot` 用于保存分享当时的标题，避免后续计划改名影响历史消息
+
+#### E. `plan_shares`
+
+- 用途：
+  - 单独沉淀分享动态，便于个人页直接汇总展示
+- 核心字段建议：
+  - `id uuid primary key`
+  - `sender_id uuid not null references public.profiles(id)`
+  - `receiver_id uuid not null references public.profiles(id)`
+  - `plan_id uuid references public.trip_plans(id)`
+  - `plan_title_snapshot text not null`
+  - `note text default ''`
+  - `created_at timestamptz not null default now()`
+
+### 11.2 RLS 建议
+
+- `friend_requests`
+  - 只有发送方和接收方可以读取
+  - 只有发送方可以创建
+  - 只有接收方可以把状态改为 `accepted / declined`
+- `friendships`
+  - 只有关系双方可以读取
+  - 只允许通过受控函数或服务端逻辑创建，不建议前端直接 `insert`
+- `direct_threads`
+  - 只有线程双方可以读取
+- `direct_messages`
+  - 只有线程双方可以读取
+  - 只有线程参与者可以发送消息
+- `plan_shares`
+  - 只有发送方和接收方可以读取
+
+### 11.3 建议落地顺序
+
+1. 先落 `friend_requests` 和 `friendships`，打通正式好友关系。
+2. 再落 `direct_threads` 和 `direct_messages`，把本地私信升级成账号级云端会话。
+3. 最后落 `plan_shares`，用于个人页分享动态和后续分享通知。
+
+### 11.4 与现有 `trip_plans` 的关系
+
+- 好友分享默认只引用已有 `trip_plans.id`，不复制完整计划内容。
+- 如果后续需要“对方可查看但不可编辑”的分享页，再额外补公开分享令牌或只读快照表。
+- 如果后续需要协作编辑，应继续复用现有 `plan_members` 方向，而不是把私信分享直接升级成协作关系。

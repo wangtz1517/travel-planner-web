@@ -35,16 +35,17 @@ async function refreshAccountData() {
   authProfile = null;
   if (!authSession?.user) {
     myPlans = [];
-    renderAuthPanels();
-    renderPlanList();
-    renderPlannerMeta();
+    renderAll();
     return;
   }
   await Promise.all([loadProfile(), loadMyPlans()]);
+  try {
+    await reconcilePlaceLibraryWithCloud();
+  } catch (error) {
+    setAccountFeedback(`地点库云端同步失败：${error.message}`, true);
+  }
   await maybeMigrateGuestDraftToCloud();
-  renderAuthPanels();
-  renderPlanList();
-  renderPlannerMeta();
+  renderAll();
 }
 
 async function maybeMigrateGuestDraftToCloud() {
@@ -88,7 +89,7 @@ async function loadProfile() {
   if (!authSession?.user || !supabaseClient) return null;
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("id, email, display_name, avatar_url, created_at, updated_at")
+    .select("*")
     .eq("id", authSession.user.id)
     .maybeSingle();
   if (error) {
@@ -97,6 +98,67 @@ async function loadProfile() {
   }
   authProfile = data || null;
   return authProfile;
+}
+
+function getCloudPlaceLibrarySnapshot() {
+  return normalizePlaceCollection(authProfile?.place_library_snapshot);
+}
+
+function isPlaceLibraryColumnMissing(error) {
+  return String(error?.message || "").includes("place_library_snapshot");
+}
+
+async function persistPlaceLibraryToCloud(nextPlaces = placeLibraryState, options = {}) {
+  if (!supabaseClient || !authSession?.user) return null;
+  const { silent = false, successMessage = "" } = options;
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .update({ place_library_snapshot: normalizePlaceCollection(nextPlaces) })
+    .eq("id", authSession.user.id)
+    .select("*")
+    .single();
+  if (error) {
+    if (isPlaceLibraryColumnMissing(error)) {
+      throw new Error("请先在 Supabase SQL Editor 执行 002-profile-place-library.sql 脚本");
+    }
+    throw error;
+  }
+  authProfile = data || authProfile;
+  if (!silent && successMessage) {
+    setCloudStatus(successMessage);
+  }
+  return authProfile;
+}
+
+async function syncPlaceLibraryToCloud(options = {}) {
+  const { silent = false, rethrow = false } = options;
+  try {
+    return await persistPlaceLibraryToCloud(placeLibraryState, options);
+  } catch (error) {
+    if (!silent) {
+      setCloudStatus(`地点库同步失败：${error.message}`, true);
+      setAccountFeedback(`地点库同步失败：${error.message}`, true);
+    }
+    if (rethrow) throw error;
+    return null;
+  }
+}
+
+async function reconcilePlaceLibraryWithCloud() {
+  const cloudPlaces = getCloudPlaceLibrarySnapshot();
+  const localPlaces = clonePlaceCollection(placeLibraryState);
+  const mergedPlaces = mergePlaceCollections(localPlaces, cloudPlaces);
+  const shouldUpdateLocal = !arePlaceCollectionsEqual(localPlaces, mergedPlaces);
+  const shouldUpdateCloud = !arePlaceCollectionsEqual(cloudPlaces, mergedPlaces);
+
+  if (shouldUpdateLocal) {
+    replacePlaceLibrary(mergedPlaces);
+    saveState(false);
+  }
+  if (shouldUpdateCloud) {
+    await syncPlaceLibraryToCloud({ silent: true, rethrow: true });
+  }
+  return mergedPlaces;
 }
 
 async function loadMyPlans() {
@@ -208,12 +270,16 @@ async function loadPlanFromCloud(planId) {
       .eq("id", planId)
       .single();
     if (error) throw error;
-    state = normalizeState(data.snapshot || {});
+    const nextState = normalizeState(data.snapshot || {});
+    const mergedPlaces = mergePlaceCollections(nextState.places, placeLibraryState);
+    state = nextState;
+    replacePlaceLibrary(mergedPlaces);
     selectedDayId = state.days[0]?.id || "";
     markPlanOpened(data.id);
     setCurrentPlanMeta(data.id, data.status || "");
     saveState(false);
     renderAll();
+    void syncPlaceLibraryToCloud({ silent: true });
     setAccountFeedback("已加载云端旅行计划。");
     setActivePage(PAGES.planner);
   } catch (error) {

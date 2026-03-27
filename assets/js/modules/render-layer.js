@@ -59,6 +59,8 @@ function setActivePage(nextPage) {
     activePage = PAGES.planner;
   } else if (nextPage === PAGES.placeLibrary) {
     activePage = PAGES.placeLibrary;
+  } else if (nextPage === PAGES.community) {
+    activePage = PAGES.community;
   } else if (nextPage === PAGES.profile) {
     activePage = PAGES.profile;
   } else {
@@ -68,18 +70,25 @@ function setActivePage(nextPage) {
   const isHome = activePage === PAGES.home;
   const isPlaceLibrary = activePage === PAGES.placeLibrary;
   const isPlanner = activePage === PAGES.planner;
+  const isCommunity = activePage === PAGES.community;
   const isProfile = activePage === PAGES.profile;
   els.homePage.hidden = !isHome;
   els.placeLibraryPage.hidden = !isPlaceLibrary;
   els.plannerPage.hidden = !isPlanner;
+  els.communityPage.hidden = !isCommunity;
   els.profilePage.hidden = !isProfile;
   els.navHomeBtn.classList.toggle("active", isHome);
   els.navPlaceLibraryBtn.classList.toggle("active", isPlaceLibrary);
   els.navPlannerBtn.classList.toggle("active", isPlanner);
+  els.navCommunityBtn.classList.toggle("active", isCommunity);
   els.navProfileBtn.classList.toggle("active", isProfile);
   if (isPlanner) {
     renderAll();
     ensureMapReady().catch(() => renderMap());
+  } else if (isPlaceLibrary) {
+    schedulePlaceLibraryMasonry();
+  } else if (isProfile) {
+    schedulePlanCardMasonry();
   }
 }
 
@@ -114,7 +123,11 @@ function renderAuthPanels() {
   const signedIn = Boolean(authSession?.user);
   els.homePage.classList.toggle("signed-in", signedIn);
   els.homeGrid.classList.toggle("signed-in", signedIn);
+  els.homeGrid.classList.toggle("guest-focus", !signedIn);
   els.accountCard.hidden = signedIn;
+  if (els.homeOverviewCard) {
+    els.homeOverviewCard.hidden = !signedIn;
+  }
   els.supabaseConfigNotice.hidden = configured;
   els.supabaseConfigNotice.textContent = configured
     ? ""
@@ -157,9 +170,10 @@ function renderHomeOverview() {
   const signedIn = Boolean(authSession?.user);
   const activeCount = myPlans.filter((plan) => plan.status !== "archived").length;
   const archivedCount = myPlans.filter((plan) => plan.status === "archived").length;
+  const currentPlan = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId) || null) : null;
   if (!signedIn) {
     els.homeOverviewBadge.textContent = configured ? "访客模式" : "待配置";
-  els.homeOverviewText.textContent = configured
+    els.homeOverviewText.textContent = configured
       ? "登录后，首页会自动聚合当前计划、最近更新和旅行足迹，并把地点库、规划页、个人页串成完整入口。"
       : "先完成 Supabase 配置，随后即可启用注册登录、云端保存、个人页和足迹地图。";
     if (els.homeSpotlightStatus) {
@@ -173,7 +187,6 @@ function renderHomeOverview() {
     renderFootprintMap().catch(() => {});
     return;
   }
-  const currentPlan = currentPlanId ? (myPlans.find((plan) => plan.id === currentPlanId) || null) : null;
   els.homeOverviewBadge.textContent = "云端已连接";
   els.homeOverviewText.textContent = currentPlan
     ? `你现在有 ${activeCount} 条进行中计划和 ${archivedCount} 条归档足迹，最适合先从「${currentPlan.title || "未命名旅行"}」继续推进。`
@@ -204,6 +217,7 @@ function renderHomeOverview() {
       : "可以去规划页新建一条计划，或者从个人页载入一条已有计划。";
     els.homeSpotlightMeta.innerHTML = `<span>${activeCount} 条进行中</span><span>${archivedCount} 条已归档</span>`;
   }
+  if (!els.profilePage.hidden) schedulePlanCardMasonry();
   renderHomeRecentPlans();
   renderFootprintMap().catch(() => {});
 }
@@ -393,6 +407,7 @@ function renderPlanList() {
     actions.append(deleteBtn);
     els.libraryPlanList.append(article);
   });
+  if (!els.profilePage.hidden) schedulePlanCardMasonry();
   renderHomeRecentPlans();
   renderFootprintMap().catch(() => {});
 }
@@ -443,17 +458,19 @@ function renderPlaces() {
     els.plannerPlaceSearchInput.value = plannerPlaceSearchQuery;
   }
   const visiblePlaces = getFilteredPlannerPlaces();
-  els.placeCount.textContent = `${visiblePlaces.length} / ${state.places.length} 个地点`;
+  els.placeCount.textContent = `${visiblePlaces.length} / ${placeLibraryState.length} 个地点`;
   visiblePlaces.forEach((place) => {
     const node = els.placeCardTemplate.content.firstElementChild.cloneNode(true);
+    const category = place.category || "other";
     node.dataset.placeId = place.id;
+    node.className = `place-card planner-place-card place-library-item tone-${category}`;
     node.querySelector(".place-name").textContent = place.name;
+    node.querySelector(".place-type-pill").textContent = getPlaceCategoryLabel(category);
     node.querySelector(".place-meta").textContent = [
       getPlaceCategoryLabel(place.category),
       getResolvedPlaceProvince(place),
       place.address || "无详细地址"
     ].filter(Boolean).join(" · ");
-    node.querySelector(".delete-place").addEventListener("click", () => removePlace(place.id));
     node.addEventListener("dragstart", () => {
       dragState = { type: "place", placeId: place.id };
       node.classList.add("dragging");
@@ -465,10 +482,11 @@ function renderPlaces() {
     });
     els.placePool.appendChild(node);
   });
+  if (visiblePlaces.length) schedulePlannerPlaceMasonry();
   if (!visiblePlaces.length) {
     const empty = document.createElement("div");
     empty.className = "empty-block";
-    empty.textContent = state.places.length ? "当前筛选条件下没有地点，换个关键词或分类试试。" : "地点库还是空的，先去地点库添加几个地点。";
+    empty.textContent = placeLibraryState.length ? "当前筛选条件下没有地点，换个关键词或分类试试。" : "地点库还是空的，先去地点库添加几个地点。";
     els.placePool.appendChild(empty);
   }
 }
@@ -533,28 +551,38 @@ function matchPlaceKeyword(place, keyword) {
 }
 
 function getFilteredPlaceLibraryPlaces() {
-  return state.places.filter((place) => {
+  return placeLibraryState.filter((place) => {
     const matchCategory = placeLibraryFilter === "all" || place.category === placeLibraryFilter;
     return matchCategory && matchPlaceKeyword(place, placeLibrarySearchQuery);
   });
 }
 
 function getFilteredPlannerPlaces() {
-  return state.places.filter((place) => {
+  return placeLibraryState.filter((place) => {
     const matchCategory = plannerPlaceFilter === "all" || place.category === plannerPlaceFilter;
     return matchCategory && matchPlaceKeyword(place, plannerPlaceSearchQuery);
   });
 }
 
 function renderPlaceLibraryFilters() {
+  const stats = {
+    all: placeLibraryState.length,
+    play: placeLibraryState.filter((place) => place.category === "play").length,
+    food: placeLibraryState.filter((place) => place.category === "food").length,
+    stay: placeLibraryState.filter((place) => place.category === "stay").length,
+    other: placeLibraryState.filter((place) => place.category === "other").length
+  };
   [
-    [els.placeFilterAllBtn, "all"],
-    [els.placeFilterPlayBtn, "play"],
-    [els.placeFilterFoodBtn, "food"],
-    [els.placeFilterStayBtn, "stay"],
-    [els.placeFilterOtherBtn, "other"]
-  ].forEach(([button, value]) => {
+    [els.placeFilterAllBtn, "all", "全部"],
+    [els.placeFilterPlayBtn, "play", "玩"],
+    [els.placeFilterFoodBtn, "food", "吃"],
+    [els.placeFilterStayBtn, "stay", "住"],
+    [els.placeFilterOtherBtn, "other", "其他"]
+  ].forEach(([button, value, label]) => {
+    if (!button) return;
     button.classList.toggle("active", placeLibraryFilter === value);
+    button.dataset.count = String(stats[value] || 0);
+    button.setAttribute("aria-label", `${label} ${stats[value] || 0} 个地点`);
   });
   if (els.placeLibrarySearchInput) {
     els.placeLibrarySearchInput.value = placeLibrarySearchQuery;
@@ -562,16 +590,16 @@ function renderPlaceLibraryFilters() {
 }
 
 function renderPlaceLibraryStats() {
-  const playCount = state.places.filter((place) => place.category === "play").length;
-  const foodCount = state.places.filter((place) => place.category === "food").length;
-  const stayCount = state.places.filter((place) => place.category === "stay").length;
-  els.placeLibraryStatAll.textContent = String(state.places.length);
+  const playCount = placeLibraryState.filter((place) => place.category === "play").length;
+  const foodCount = placeLibraryState.filter((place) => place.category === "food").length;
+  const stayCount = placeLibraryState.filter((place) => place.category === "stay").length;
+  els.placeLibraryStatAll.textContent = String(placeLibraryState.length);
   els.placeLibraryStatPlay.textContent = String(playCount);
   els.placeLibraryStatFood.textContent = String(foodCount);
   els.placeLibraryStatStay.textContent = String(stayCount);
-  els.placeLibraryCount.textContent = `${state.places.length} 个地点`;
+  els.placeLibraryCount.textContent = `${placeLibraryState.length} 个地点`;
   if (els.profileHubPlaceCount) {
-    els.profileHubPlaceCount.textContent = String(state.places.length);
+    els.profileHubPlaceCount.textContent = String(placeLibraryState.length);
   }
 }
 
@@ -582,8 +610,8 @@ function renderPlaceLibraryList() {
   const places = getFilteredPlaceLibraryPlaces();
   els.placeLibraryEmpty.hidden = places.length > 0;
   els.placeLibrarySummary.textContent = placeLibraryNotice
-    ? `当前显示 ${places.length} 个地点，共 ${state.places.length} 个 · ${placeLibraryNotice}`
-    : `当前显示 ${places.length} 个地点，共 ${state.places.length} 个`;
+    ? `当前显示 ${places.length} 个地点，共 ${placeLibraryState.length} 个 · ${placeLibraryNotice}`
+    : `当前显示 ${places.length} 个地点，共 ${placeLibraryState.length} 个`;
   if (!places.length) return;
   places.forEach((place) => {
     const article = document.createElement("article");
@@ -624,13 +652,13 @@ function renderPlaceLibraryList() {
   schedulePlaceLibraryMasonry();
 }
 
-function layoutPlaceLibraryMasonry() {
-  if (!els.placeLibraryList || !els.placeLibraryList.children.length) return;
-  const styles = window.getComputedStyle(els.placeLibraryList);
+function layoutMasonryGrid(container) {
+  if (!container || !container.children.length) return;
+  const styles = window.getComputedStyle(container);
   const rowSize = Number.parseFloat(styles.gridAutoRows);
   const rowGap = Number.parseFloat(styles.rowGap || styles.gap);
   if (!rowSize || Number.isNaN(rowSize)) return;
-  [...els.placeLibraryList.children].forEach((item) => {
+  [...container.children].forEach((item) => {
     item.style.setProperty("--place-card-span", "1");
     const contentHeight = item.scrollHeight;
     const span = Math.max(1, Math.ceil((contentHeight + rowGap) / (rowSize + rowGap)));
@@ -638,13 +666,29 @@ function layoutPlaceLibraryMasonry() {
   });
 }
 
-function schedulePlaceLibraryMasonry() {
-  if (!els.placeLibraryList) return;
+function scheduleMasonryGrid(container) {
+  if (!container) return;
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
-      layoutPlaceLibraryMasonry();
+      layoutMasonryGrid(container);
     });
   });
+}
+
+function layoutPlaceLibraryMasonry() {
+  layoutMasonryGrid(els.placeLibraryList);
+}
+
+function schedulePlaceLibraryMasonry() {
+  scheduleMasonryGrid(els.placeLibraryList);
+}
+
+function schedulePlannerPlaceMasonry() {
+  scheduleMasonryGrid(els.placePool);
+}
+
+function schedulePlanCardMasonry() {
+  scheduleMasonryGrid(els.libraryPlanList);
 }
 
 function renderProfileHub() {
@@ -653,7 +697,317 @@ function renderProfileHub() {
   els.profileHubAuthBadge.textContent = signedIn ? "已登录" : "未登录";
   els.profileHubName.textContent = signedIn ? displayName : "-";
   els.profileHubEmail.textContent = signedIn ? (authSession?.user?.email || "-") : "-";
-  els.profileHubPlaceCount.textContent = String(state.places.length);
+  els.profileHubPlaceCount.textContent = String(placeLibraryState.length);
+}
+
+function formatSocialTime(value) {
+  if (!value) return "";
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "";
+  const diff = Date.now() - timestamp;
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < hour) return `${Math.max(1, Math.round(diff / minute))} 分钟前`;
+  if (diff < day) return `${Math.max(1, Math.round(diff / hour))} 小时前`;
+  if (diff < 7 * day) return `${Math.max(1, Math.round(diff / day))} 天前`;
+  return new Date(timestamp).toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function renderSocialHub() {
+  syncSocialStateScope();
+  const signedIn = Boolean(authSession?.user);
+  const discovery = getSocialDiscoveryResults();
+  const incomingRequests = getSocialRequests("incoming");
+  const outgoingRequests = getSocialRequests("outgoing");
+  const pendingRequests = [...incomingRequests, ...outgoingRequests]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const friends = getSocialFriends();
+  const conversations = getSocialConversations();
+  const shares = getSocialShares();
+  const selectedConversation = getSelectedSocialConversation();
+  const selectedProfile = selectedConversation ? getSocialProfile(selectedConversation.participantId) : null;
+  const unreadCount = conversations.reduce((sum, conversation) => sum + Number(conversation.unreadCount || 0), 0);
+
+  els.socialModeBadge.textContent = signedIn ? "账号本地版" : "本地预览";
+  els.socialFriendCount.textContent = String(friends.length);
+  els.socialRequestCount.textContent = String(pendingRequests.length);
+  els.socialUnreadCount.textContent = String(unreadCount);
+  els.socialShareCount.textContent = String(shares.length);
+  els.socialNetworkHint.textContent = signedIn
+    ? "先在这里验证加好友、私信和行程分享链路；当前按账号做本地持久化，后续再接云端同步。"
+    : "当前展示的是社交模块预览态，登录后会按账号维度保留好友和私信数据。";
+  if (els.socialSearchInput.value !== socialSearchQuery) {
+    els.socialSearchInput.value = socialSearchQuery;
+  }
+  els.socialQuickAddBtn.disabled = discovery.length === 0;
+
+  els.socialDiscoveryList.innerHTML = "";
+  if (!discovery.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = socialSearchQuery
+      ? "没找到新的旅行搭子，试试换个关键词，或者先处理下面已有的好友申请。"
+      : "当前没有新的推荐对象了，先从下面的申请和好友列表继续推进。";
+    els.socialDiscoveryList.appendChild(empty);
+  } else {
+    discovery.forEach((profile) => {
+      const article = document.createElement("article");
+      article.className = "social-card";
+      article.innerHTML = `
+        <div class="social-card-top">
+          <div>
+            <h4>${escapeHtml(profile.name)}</h4>
+            <p class="muted">${escapeHtml(profile.handle)}${profile.city ? ` · ${escapeHtml(profile.city)}` : ""}</p>
+          </div>
+          <span class="social-chip">推荐</span>
+        </div>
+        <p class="panel-note social-card-note">${escapeHtml(profile.note || "适合进一步扩展成你的旅行好友网络。")}</p>
+        <div class="social-tag-list">
+          ${(profile.tags || []).map((tag) => `<span class="social-tag">${escapeHtml(tag)}</span>`).join("")}
+        </div>
+      `;
+      const actions = document.createElement("div");
+      actions.className = "social-card-actions";
+      const requestBtn = document.createElement("button");
+      requestBtn.type = "button";
+      requestBtn.className = "small";
+      requestBtn.textContent = "发送申请";
+      requestBtn.addEventListener("click", () => {
+        if (!sendFriendRequest(profile.id)) {
+          setAccountFeedback(`暂时无法向 ${profile.name} 发起好友申请。`, true);
+          return;
+        }
+        setAccountFeedback(`已向 ${profile.name} 发送好友申请。`);
+        renderSocialHub();
+      });
+      actions.append(requestBtn);
+      article.append(actions);
+      els.socialDiscoveryList.appendChild(article);
+    });
+  }
+
+  els.socialRequestList.innerHTML = "";
+  if (!pendingRequests.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = "当前没有待处理的好友申请，你可以直接添加新的旅行搭子。";
+    els.socialRequestList.appendChild(empty);
+  } else {
+    pendingRequests.forEach((request) => {
+      const isIncoming = request.direction === "incoming";
+      const article = document.createElement("article");
+      article.className = "social-card";
+      article.innerHTML = `
+        <div class="social-card-top">
+          <div>
+            <h4>${escapeHtml(request.profile.name)}</h4>
+            <p class="muted">${escapeHtml(request.profile.handle)}${request.profile.city ? ` · ${escapeHtml(request.profile.city)}` : ""}</p>
+          </div>
+          <span class="social-chip ${isIncoming ? "tone-positive" : ""}">${isIncoming ? "收到申请" : "已发申请"}</span>
+        </div>
+        <p class="panel-note social-card-note">${escapeHtml(request.message || (isIncoming ? "对方希望先建立好友关系，再一起分享行程。" : "你已经发出好友申请，等待对方回应。"))}</p>
+        <div class="social-inline-meta">
+          <span>${escapeHtml(formatSocialTime(request.createdAt))}</span>
+        </div>
+      `;
+      const actions = document.createElement("div");
+      actions.className = "social-card-actions";
+      if (isIncoming) {
+        const acceptBtn = document.createElement("button");
+        acceptBtn.type = "button";
+        acceptBtn.className = "small";
+        acceptBtn.textContent = "接受";
+        acceptBtn.addEventListener("click", () => {
+          const profileId = acceptFriendRequest(request.id);
+          if (!profileId) return;
+          setAccountFeedback(`已通过 ${request.profile.name} 的好友申请。`);
+          renderSocialHub();
+        });
+        const declineBtn = document.createElement("button");
+        declineBtn.type = "button";
+        declineBtn.className = "ghost small";
+        declineBtn.textContent = "忽略";
+        declineBtn.addEventListener("click", () => {
+          declineFriendRequest(request.id);
+          setAccountFeedback(`已忽略 ${request.profile.name} 的好友申请。`);
+          renderSocialHub();
+        });
+        actions.append(acceptBtn, declineBtn);
+      } else {
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "ghost small";
+        cancelBtn.textContent = "撤回申请";
+        cancelBtn.addEventListener("click", () => {
+          declineFriendRequest(request.id);
+          setAccountFeedback(`已撤回发给 ${request.profile.name} 的好友申请。`);
+          renderSocialHub();
+        });
+        actions.append(cancelBtn);
+      }
+      article.append(actions);
+      els.socialRequestList.appendChild(article);
+    });
+  }
+
+  els.socialFriendList.innerHTML = "";
+  if (!friends.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = "还没有好友，先从上面的推荐中加几个常用搭子，再开始分享你的行程。";
+    els.socialFriendList.appendChild(empty);
+  } else {
+    friends.forEach((friend) => {
+      const lastMessage = friend.conversation?.messages?.slice(-1)[0] || null;
+      const article = document.createElement("article");
+      article.className = "social-card";
+      article.innerHTML = `
+        <div class="social-card-top">
+          <div>
+            <h4>${escapeHtml(friend.profile.name)}</h4>
+            <p class="muted">${escapeHtml(friend.profile.handle)}${friend.profile.city ? ` · ${escapeHtml(friend.profile.city)}` : ""}</p>
+          </div>
+          ${friend.conversation?.unreadCount ? `<span class="social-chip tone-unread">${escapeHtml(String(friend.conversation.unreadCount))} 未读</span>` : `<span class="social-chip">好友</span>`}
+        </div>
+        <p class="panel-note social-card-note">${escapeHtml(lastMessage?.text || friend.profile.note || "已经建立好友关系，可以直接开聊。")}</p>
+        <div class="social-tag-list">
+          ${(friend.profile.tags || []).map((tag) => `<span class="social-tag">${escapeHtml(tag)}</span>`).join("")}
+        </div>
+        <div class="social-inline-meta">
+          <span>${lastMessage ? `最近互动 ${escapeHtml(formatSocialTime(lastMessage.createdAt))}` : `成为好友 ${escapeHtml(formatSocialTime(friend.connectedAt))}`}</span>
+        </div>
+      `;
+      const actions = document.createElement("div");
+      actions.className = "social-card-actions";
+      const chatBtn = document.createElement("button");
+      chatBtn.type = "button";
+      chatBtn.className = "small";
+      chatBtn.textContent = "打开私信";
+      chatBtn.addEventListener("click", () => {
+        openSocialConversation(friend.profileId);
+        renderSocialHub();
+      });
+      const shareBtn = document.createElement("button");
+      shareBtn.type = "button";
+      shareBtn.className = "ghost small";
+      shareBtn.textContent = "分享当前行程";
+      shareBtn.addEventListener("click", () => {
+        const result = sharePlanWithFriend(friend.profileId);
+        if (!result.ok) {
+          setAccountFeedback(result.message, true);
+          return;
+        }
+        setAccountFeedback(`已把《${result.planTitle}》分享给 ${friend.profile.name}。`);
+        renderSocialHub();
+      });
+      actions.append(chatBtn, shareBtn);
+      article.append(actions);
+      els.socialFriendList.appendChild(article);
+    });
+  }
+
+  els.socialConversationTabs.innerHTML = "";
+  if (!conversations.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block social-tabs-empty";
+    empty.textContent = "好友通过后，会在这里自动生成私信会话。";
+    els.socialConversationTabs.appendChild(empty);
+  } else {
+    conversations.forEach((conversation) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `social-conversation-tab${selectedConversation?.id === conversation.id ? " active" : ""}`;
+      button.innerHTML = `
+        <span>${escapeHtml(conversation.profile.name)}</span>
+        ${conversation.unreadCount ? `<span class="social-tab-count">${escapeHtml(String(conversation.unreadCount))}</span>` : ""}
+      `;
+      button.addEventListener("click", () => {
+        openSocialConversation(conversation.participantId);
+        renderSocialHub();
+      });
+      els.socialConversationTabs.appendChild(button);
+    });
+  }
+
+  els.socialConversationTitle.textContent = selectedProfile?.name || "先选择一个好友";
+  els.socialConversationMeta.textContent = selectedConversation
+    ? [selectedProfile?.handle || "", selectedProfile?.city || "", selectedConversation.messages.length ? `最后互动 ${formatSocialTime(selectedConversation.messages.slice(-1)[0].createdAt)}` : ""]
+        .filter(Boolean)
+        .join(" · ")
+    : "好友通过申请后，就能在这里持续沟通和分享路线。";
+  els.socialConversationFeed.innerHTML = "";
+  if (!selectedConversation) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = "左侧选择一个好友，或者先接受新的好友申请，就能开始私信对话。";
+    els.socialConversationFeed.appendChild(empty);
+  } else if (!selectedConversation.messages.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = "这段会话还没有消息，先发一句开场白，或者直接分享当前行程。";
+    els.socialConversationFeed.appendChild(empty);
+  } else {
+    selectedConversation.messages.forEach((message) => {
+      const senderName = message.sender === "me"
+        ? "我"
+        : message.sender === "system"
+          ? "系统"
+          : selectedProfile?.name || "好友";
+      const tone = message.sender === "me"
+        ? "outgoing"
+        : message.sender === "system"
+          ? "system"
+          : "incoming";
+      const article = document.createElement("article");
+      article.className = `social-message social-message-${tone}${message.type === "share" ? " is-share" : ""}`;
+      article.innerHTML = `
+        <div class="social-message-meta">
+          <strong>${escapeHtml(senderName)}</strong>
+          <span>${escapeHtml(formatSocialTime(message.createdAt))}</span>
+        </div>
+        <p>${escapeHtml(message.text || "")}</p>
+        ${message.planTitle ? `<div class="social-share-chip">《${escapeHtml(message.planTitle)}》</div>` : ""}
+      `;
+      els.socialConversationFeed.appendChild(article);
+    });
+  }
+
+  els.socialMessageInput.disabled = !selectedConversation;
+  els.socialSendMessageBtn.disabled = !selectedConversation;
+  els.socialSharePlanBtn.disabled = !selectedConversation;
+  if (!selectedConversation) {
+    els.socialMessageInput.placeholder = "先在左侧打开一个好友会话";
+  } else {
+    els.socialMessageInput.placeholder = `发给 ${selectedProfile?.name || "好友"} 的消息`;
+  }
+
+  els.socialShareFeed.innerHTML = "";
+  if (!shares.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-block";
+    empty.textContent = "还没有分享动态，等你把第一条行程发给好友后，这里会开始沉淀记录。";
+    els.socialShareFeed.appendChild(empty);
+  } else {
+    shares.forEach((share) => {
+      const article = document.createElement("article");
+      article.className = "social-share-item";
+      article.innerHTML = `
+        <div class="social-share-top">
+          <strong>${escapeHtml(share.direction === "received" ? `${share.profile.name} 分享给你` : `你分享给 ${share.profile.name}`)}</strong>
+          <span class="muted">${escapeHtml(formatSocialTime(share.createdAt))}</span>
+        </div>
+        <p class="social-share-title">《${escapeHtml(share.planTitle || "未命名旅行")}》</p>
+        <p class="panel-note social-card-note">${escapeHtml(share.note || "这条分享还没有附加说明。")}</p>
+      `;
+      els.socialShareFeed.appendChild(article);
+    });
+  }
 }
 
 function buildPlaceTypeOptions(select, value) {
@@ -698,10 +1052,15 @@ function renderDayTabs() {
     btn.addEventListener("click", () => {
       selectedDayId = day.id;
       els.mapDaySelect.value = day.id;
-      renderAll();
+      renderPlannerDayView();
     });
     els.dayTabs.appendChild(btn);
   });
+}
+
+function renderPlannerDayView() {
+  renderDays();
+  if (activePage === PAGES.planner) renderMap();
 }
 
 function renderDays() {
@@ -710,7 +1069,7 @@ function renderDays() {
   if (!state.days.length) {
     const empty = document.createElement("div");
     empty.className = "muted";
-    empty.textContent = "先填写日期，并点击“生成天数”。";
+    empty.textContent = "先选择行程日期，系统会自动生成天数。";
     els.daysContainer.appendChild(empty);
     updateMapDayOptions();
     return;
@@ -724,10 +1083,11 @@ function renderDays() {
   node.querySelector(".day-title").textContent = day.title || `Day ${dayIndex + 1}`;
   node.querySelector(".day-date").textContent = formatDate(day.date);
   node.querySelector(".day-stats").textContent = `停留 ${formatMinutes(stats.stayMinutes)} / 出行 ${formatMinutes(stats.travelMinutes)} / 里程 ${formatDistance(stats.distanceKm)}`;
-  if (stats.diagnostics?.length) {
+  const primaryDiagnostic = stats.diagnostics?.[0] || null;
+  if (primaryDiagnostic && primaryDiagnostic.label !== "待开始") {
     const diagnostic = document.createElement("div");
-    diagnostic.className = `day-diagnostic tone-${stats.diagnostics[0].tone || "calm"}`;
-    diagnostic.innerHTML = `<strong>${escapeHtml(stats.diagnostics[0].label)}</strong><span>${escapeHtml(stats.diagnostics[0].message)}</span>`;
+    diagnostic.className = `day-diagnostic tone-${primaryDiagnostic.tone || "calm"}`;
+    diagnostic.innerHTML = `<strong>${escapeHtml(primaryDiagnostic.label)}</strong><span>${escapeHtml(primaryDiagnostic.message)}</span>`;
     node.querySelector(".day-header").appendChild(diagnostic);
   }
   dropZone.classList.toggle("empty", day.items.length === 0);
@@ -775,10 +1135,6 @@ function renderDays() {
     } else {
       startField.classList.add("field-hidden");
     }
-
-    const notesInput = itemNode.querySelector(".item-notes");
-    notesInput.value = item.notes || "";
-    notesInput.addEventListener("change", () => updateItem(day.id, item.id, { notes: notesInput.value.trim() }));
 
     itemNode.querySelector(".remove-item").addEventListener("click", () => removeItem(day.id, item.id));
     itemNode.addEventListener("dragstart", () => {
@@ -880,11 +1236,11 @@ function renderAll() {
   syncStateToTripInputs();
   renderAuthPanels();
   renderProfileHub();
+  renderSocialHub();
   renderPlanList();
   renderPlannerMeta();
   renderPlaces();
   renderPlaceLibraryList();
-  renderDays();
-  if (activePage === PAGES.planner) renderMap();
+  renderPlannerDayView();
   saveState(false);
 }

@@ -6,7 +6,7 @@
   <title>行旅派 | GoPace</title>
   <meta name="description" content="行旅派 GoPace：支持账号、计划归档与多日路线整理的旅行规划工具">
   <link rel="icon" type="image/svg+xml" href="logo/logo-symbol-color.svg?v=20260324-1">
-  <link rel="stylesheet" href="assets/css/main.css?v=20260324-1">
+  <link rel="stylesheet" href="assets/css/main.css?v=20260327-29">
 </head>
 <body>
   <div class="app-shell">
@@ -40,6 +40,7 @@
             <button id="navHomeBtn" type="button" class="nav-tab active">首页</button>
             <button id="navPlaceLibraryBtn" type="button" class="nav-tab">地点库</button>
             <button id="navPlannerBtn" type="button" class="nav-tab">规划页</button>
+            <button id="navCommunityBtn" type="button" class="nav-tab">社区页</button>
             <button id="navProfileBtn" type="button" class="nav-tab">个人信息</button>
           </nav>
           <button id="authBadge" type="button" class="status-badge auth-badge-button" disabled>游客模式</button>
@@ -49,6 +50,42 @@
     <div id="localOpenNotice" class="local-open-notice" hidden></div>
 
     <section id="homePage" class="page-section home-page">
+      <section id="homeMasthead" class="card home-masthead">
+        <div class="home-masthead-bar">
+          <div class="home-masthead-copy">
+            <div class="home-masthead-topline">
+              <span class="eyebrow">Home Base</span>
+            </div>
+            <h1 class="home-masthead-title">把灵感、路线和回忆，整理成一张会生长的旅行地图。</h1>
+            <p class="home-masthead-subline">先在地点库收集想去的地方，再到规划页编排每日路线，完成后回到首页归档为足迹。这里会把整条旅程工作流串成一张清晰总览。</p>
+          </div>
+        </div>
+
+        <div class="home-masthead-body">
+          <div class="home-masthead-body-copy">
+            <span class="eyebrow">Start Here</span>
+            <p>第一次打开先按下面三步走：先收藏地点，再编排路线，最后把完成的旅行沉淀成足迹，无论是否登录，这套入口都保持一致。</p>
+          </div>
+          <div class="home-stage-board">
+            <button id="homeStageLibraryAction" type="button" class="home-stage-card home-stage-action tone-library">
+              <span class="home-stage-step">01</span>
+              <strong>灵感入库</strong>
+              <p>把平时看到、听到、收藏过的地点先沉淀下来，形成自己的旅行素材库。</p>
+            </button>
+            <button id="homeStagePlannerAction" type="button" class="home-stage-card home-stage-action tone-planner">
+              <span class="home-stage-step">02</span>
+              <strong>行程路线</strong>
+              <p>把地点分配到每天行程里，补齐交通、节奏与时间，让计划真正能落地。</p>
+            </button>
+            <button id="homeStageFootprintAction" type="button" class="home-stage-card home-stage-action tone-footprint">
+              <span class="home-stage-step">03</span>
+              <strong>足迹归档</strong>
+              <p>旅行结束后回到首页归档，已走过的城市会继续沉淀到下方足迹地图里。</p>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div id="homeGrid" class="home-grid">
         <section id="accountCard" class="card home-card account-card">
           <div class="section-head">
@@ -115,7 +152,7 @@
           </div>
         </section>
 
-        <section class="card home-card home-overview-card">
+        <section id="homeOverviewCard" class="card home-card home-overview-card">
           <div class="section-head">
             <div>
               <p class="eyebrow">Overview</p>
@@ -126,9 +163,9 @@
           <div class="home-overview-shell">
             <div class="overview-intro-row">
               <p id="homeOverviewText" class="panel-note overview-intro">在这里管理账号、进入地点库和规划页，并在个人信息页统一查看、归档和编辑你的旅行计划。</p>
-              <div class="overview-actions">
-                <button id="homeOpenPlannerBtn" type="button">进入规划页</button>
-                <button id="homeOpenProfileBtn" type="button" class="ghost">打开个人页</button>
+              <div class="overview-intro-side">
+                <span class="eyebrow">Journey Console</span>
+                <strong>当前计划、指标与最近更新会在这里持续汇总</strong>
               </div>
             </div>
             <article id="homePlanSpotlight" class="overview-spotlight">
@@ -227,19 +264,17 @@
 
     <section id="placeLibraryPage" class="page-section library-page" hidden>
       <section class="card home-card library-card place-library-card">
-        <div class="section-head">
+        <div class="section-head place-library-head">
           <div>
             <p class="eyebrow">Place Library</p>
-            <h2>地点库</h2>
-          </div>
-          <div class="plan-toolbar-actions">
-            <button id="placeLibraryOpenPlannerBtn" type="button" class="small">进入规划页</button>
-            <button id="placeLibraryOpenProfileBtn" type="button" class="ghost small">查看个人页</button>
+            <div class="place-library-title-line">
+              <h2>地点库</h2>
+              <p class="panel-note">先把平时看到、听到、想去的地点沉淀到这里，再在规划页中直接调用。当前保留按玩、吃、住等分类整理，地点所属省份会结合地址信息自动识别。</p>
+            </div>
           </div>
         </div>
-        <p class="panel-note">先把平时看到、听到、想去的地点沉淀到这里，再在规划页中直接调用。当前保留按玩、吃、住等分类整理，地点所属省份会结合地址信息自动识别。</p>
 
-        <div class="place-library-stats">
+        <div class="place-library-stats" hidden aria-hidden="true">
           <article class="plan-stat-card">
             <span>全部地点</span>
             <strong id="placeLibraryStatAll">0</strong>
@@ -301,6 +336,137 @@
       </section>
     </section>
 
+    <section id="communityPage" class="page-section library-page" hidden>
+      <section class="card home-card plans-card library-card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Community</p>
+            <h2>社区页</h2>
+          </div>
+        </div>
+        <p class="panel-note">这里集中管理旅行搭子、私信和行程分享，把原先放在个人信息页里的好友相关能力单独收拢成一页，社区入口也放到了个人信息前面。</p>
+
+        <div class="profile-hub-grid">
+          <section class="profile-hub-card">
+            <div class="sub-head">
+              <div>
+                <h3>好友中心总览</h3>
+                <p class="muted">把搭子、私信和行程分享集中到社区中</p>
+              </div>
+              <span id="socialModeBadge" class="status-badge">本地预览</span>
+            </div>
+            <div class="profile-feature-list social-overview-metrics">
+              <article class="overview-metric-card">
+                <span>好友数量</span>
+                <strong id="socialFriendCount">0</strong>
+              </article>
+              <article class="overview-metric-card">
+                <span>待处理申请</span>
+                <strong id="socialRequestCount">0</strong>
+              </article>
+              <article class="overview-metric-card">
+                <span>未读私信</span>
+                <strong id="socialUnreadCount">0</strong>
+              </article>
+              <article class="overview-metric-card">
+                <span>分享动态</span>
+                <strong id="socialShareCount">0</strong>
+              </article>
+            </div>
+          </section>
+
+          <section class="profile-hub-card">
+            <div class="sub-head">
+              <div>
+                <h3>当前阶段</h3>
+                <p class="muted">先把社交链路单独拉直，后续再继续接入云端</p>
+              </div>
+            </div>
+            <div class="profile-feature-list">
+              <p class="panel-note">推荐好友：按昵称、邮箱或城市搜索潜在搭子，先建立轻关系。</p>
+              <p class="panel-note">私信对话：围绕路线、预算和集合点持续沟通，不把讨论塞回个人页。</p>
+              <p class="panel-note">行程分享：把当前绑定计划或当前草稿直接发给好友，验证分享闭环。</p>
+              <p class="panel-note">本地预览：当前仍按账号维度做本地持久化，后续再接 Supabase 云端同步。</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="social-hub-layout">
+          <section class="social-panel social-network-panel">
+            <div class="sub-head">
+              <div>
+                <h3>好友网络</h3>
+                <p id="socialNetworkHint" class="muted">添加旅行搭子、处理好友申请，并把合适的行程分享给他们。</p>
+              </div>
+            </div>
+            <div class="social-add-bar">
+              <label class="plan-search-field social-search-field">
+                <span>添加好友</span>
+                <input id="socialSearchInput" type="search" placeholder="搜昵称、邮箱或城市">
+              </label>
+              <button id="socialQuickAddBtn" type="button" class="small">发送申请</button>
+            </div>
+            <div id="socialDiscoveryList" class="social-discovery-list"></div>
+            <div class="social-panel-section">
+              <div class="sub-head social-sub-head">
+                <div>
+                  <h4>待处理申请</h4>
+                  <p class="muted">可以先接受常用搭子，后续再分享路线</p>
+                </div>
+              </div>
+              <div id="socialRequestList" class="social-request-list"></div>
+            </div>
+            <div class="social-panel-section">
+              <div class="sub-head social-sub-head">
+                <div>
+                  <h4>好友列表</h4>
+                  <p class="muted">从这里可以直接打开私信或发出当前行程</p>
+                </div>
+              </div>
+              <div id="socialFriendList" class="social-friend-list"></div>
+            </div>
+          </section>
+
+          <section class="social-panel social-conversation-panel">
+            <div class="sub-head">
+              <div>
+                <h3>私信对话</h3>
+                <p class="muted">聊路线、预算和集合点，也可以在会话里直接分享计划。</p>
+              </div>
+            </div>
+            <div id="socialConversationTabs" class="social-conversation-tabs"></div>
+            <div class="social-conversation-shell">
+              <div class="social-conversation-header">
+                <div>
+                  <h4 id="socialConversationTitle">先选择一个好友</h4>
+                  <p id="socialConversationMeta" class="muted">好友接受申请后，就能在这里持续沟通和分享路线。</p>
+                </div>
+              </div>
+              <div id="socialConversationFeed" class="social-conversation-feed"></div>
+              <label class="social-message-field">
+                <span>发送消息</span>
+                <textarea id="socialMessageInput" rows="3" placeholder="例如：周六上午先去美术馆，下午再去咖啡馆会不会更顺？"></textarea>
+              </label>
+              <div class="social-composer-actions">
+                <button id="socialSendMessageBtn" type="button" class="small">发送私信</button>
+                <button id="socialSharePlanBtn" type="button" class="ghost small">分享当前行程</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="social-panel social-share-panel">
+            <div class="sub-head">
+              <div>
+                <h3>分享动态</h3>
+                <p class="muted">最近发出的计划、收到的路线灵感，以及分享后的状态更新。</p>
+              </div>
+            </div>
+            <div id="socialShareFeed" class="social-share-feed"></div>
+          </section>
+        </div>
+      </section>
+    </section>
+
     <section id="profilePage" class="page-section library-page" hidden>
       <section class="card home-card plans-card library-card">
         <div class="section-head">
@@ -314,14 +480,14 @@
             <button id="refreshPlansBtn" type="button" class="ghost small">刷新</button>
           </div>
         </div>
-        <p class="panel-note">这里作为你的个人中心使用。当前先聚合账号信息、地点库概况和完整行程管理，后续会继续扩展好友、社交和更多“我的”能力。</p>
+        <p class="panel-note">这里回到更纯粹的“我的”工作台，集中查看账号概况、地点收藏、足迹沉淀和完整行程管理；好友相关能力已经独立放到社区页。</p>
 
         <div class="profile-hub-grid">
           <section class="profile-hub-card">
             <div class="sub-head">
               <div>
                 <h3>账号概况</h3>
-                <p class="muted">作为后续好友和社交能力的入口</p>
+                <p class="muted">统一查看当前账号、收藏与归档状态</p>
               </div>
               <span id="profileHubAuthBadge" class="status-badge">未登录</span>
             </div>
@@ -348,23 +514,15 @@
           <section class="profile-hub-card">
             <div class="sub-head">
               <div>
-                <h3>后续开发方向</h3>
-                <p class="muted">保留“我的”页面的功能扩展位</p>
+                <h3>个人工作台</h3>
+                <p class="muted">把旅行资产和计划维护留在个人页内完成</p>
               </div>
             </div>
             <div class="profile-feature-list">
-              <article class="overview-metric-card">
-                <span>好友系统</span>
-                <strong>待开发</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>共同收藏</span>
-                <strong>待开发</strong>
-              </article>
-              <article class="overview-metric-card">
-                <span>个人偏好</span>
-                <strong>待开发</strong>
-              </article>
+              <p class="panel-note">账号与状态：确认当前登录身份、邮箱以及地点收藏沉淀情况。</p>
+              <p class="panel-note">计划管理：从下面直接筛选、载入、归档、复制或删除已有旅行计划。</p>
+              <p class="panel-note">当前绑定：把正在推进的路线持续绑定到规划页，减少来回切换成本。</p>
+              <p class="panel-note">足迹沉淀：已归档行程会继续回流到首页足迹地图，形成你的长期旅行资产。</p>
             </div>
           </section>
         </div>
@@ -428,17 +586,20 @@
           <p id="currentPlanLabel" class="planner-caption">当前云端计划：未绑定</p>
         </div>
         <section class="trip-inline">
-          <label><span>旅行名称</span><input id="tripName" type="text" placeholder="例如：苏州杭州 3 日游"></label>
-          <label><span>人数</span><input id="travelerCount" type="number" min="1" value="2"></label>
-          <label><span>开始日期</span><input id="startDate" type="date"></label>
-          <label><span>结束日期</span><input id="endDate" type="date"></label>
+          <label class="trip-field trip-name-field"><span>旅行名称</span><input id="tripName" type="text" placeholder="例如：苏州杭州 3 日游"></label>
+          <label class="trip-field trip-traveler-field"><span>人数</span><input id="travelerCount" type="number" min="1" value="2"></label>
+          <label class="trip-field trip-date-range-field">
+            <span>行程日期</span>
+            <button id="tripDateRangeBtn" type="button" class="trip-date-range-trigger">
+              <span id="tripDateRangeValue" class="trip-date-range-value">未设置日期</span>
+            </button>
+            <input id="tripDatePicker" class="trip-date-picker" type="date" tabindex="-1" aria-hidden="true">
+            <input id="startDate" type="date" hidden>
+            <input id="endDate" type="date" hidden>
+          </label>
         </section>
         <div class="top-actions">
-          <button id="generateDaysBtn" type="button">生成天数</button>
-          <button id="saveBtn" type="button" class="ghost">保存到本地</button>
           <button id="saveCloudBtn" type="button">保存到云端</button>
-          <button id="openPlaceLibraryBtn" type="button" class="ghost">地点库</button>
-          <button id="openProfileBtn" type="button" class="ghost">个人页</button>
           <button id="exportBtn" type="button" class="ghost">导出 PDF</button>
           <button id="resetBtn" type="button" class="ghost">清空</button>
         </div>
@@ -449,20 +610,16 @@
           <div class="section-head">
             <div>
               <h2>规划页候选地点</h2>
-              <p class="muted">这里直接显示地点库中已收藏的地点</p>
+              <p class="planner-caption">这里直接显示地点库中已收藏的地点</p>
             </div>
             <span id="saveStatus" class="status">本地未保存</span>
-          </div>
-          <div class="planner-library-entry">
-            <p class="panel-note">需要新增或整理地点时，先去独立地点库维护分类，再回到这里拖入行程。</p>
-            <button id="plannerOpenPlaceLibraryBtn" type="button" class="ghost small">打开地点库</button>
           </div>
           <div class="planner-place-filters">
             <label class="plan-search-field">
               <span>快速搜索</span>
               <input id="plannerPlaceSearchInput" type="search" placeholder="例如：北京、酒店、烤鸭">
             </label>
-            <label>
+            <label class="planner-place-category-field">
               <span>分类</span>
               <select id="plannerPlaceCategorySelect">
                 <option value="all">全部分类</option>
@@ -472,13 +629,7 @@
                 <option value="other">其他</option>
               </select>
             </label>
-          </div>
-          <div class="sub-head">
-            <h3>已加入地点库</h3>
-            <span id="placeCount" class="muted">0 个地点</span>
-          </div>
-          <div class="planner-status-row">
-            <span id="cloudStatus" class="muted">云端未连接</span>
+            <span id="placeCount" class="muted planner-place-count-inline">0 / 0 个地点</span>
           </div>
           <div id="placePool" class="place-pool"></div>
         </section>
@@ -486,6 +637,8 @@
         <section class="card pane center-pane">
           <div class="section-head center-head">
             <h2>多日行程规划</h2>
+          </div>
+          <div class="day-tabs-row">
             <div id="dayTabs" class="day-tabs"></div>
           </div>
           <div id="daysContainer" class="days-container"></div>
@@ -513,13 +666,13 @@
   </div>
 
   <template id="placeCardTemplate">
-    <article class="place-card" draggable="true">
-      <div class="place-title-row">
-        <div class="place-main">
+    <article class="place-card planner-place-card place-library-item tone-other" draggable="true">
+      <div class="place-library-title-block">
+        <div class="place-library-headline">
           <h3 class="place-name"></h3>
-          <p class="mini place-meta"></p>
+          <span class="place-library-type-pill place-type-pill"></span>
         </div>
-        <button type="button" class="small ghost delete-place">删除</button>
+        <p class="mini place-meta"></p>
       </div>
     </article>
   </template>
@@ -565,10 +718,6 @@
         <label><span>类型</span><select class="place-type"></select></label>
         <label class="stay-field"><span>停留</span><select class="stay-duration"></select></label>
       </div>
-      <label class="compact-note-field">
-        <span>备注</span>
-        <input class="item-notes" type="text" placeholder="可选备注">
-      </label>
     </article>
   </template>
 
@@ -604,13 +753,13 @@
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="assets/js/modules/state-layer.js?v=20260326-1"></script>
-  <script src="assets/js/modules/planner-layer.js?v=20260326-1"></script>
+  <script src="assets/js/modules/state-layer.js?v=20260327-21"></script>
+  <script src="assets/js/modules/planner-layer.js?v=20260327-6"></script>
   <script src="assets/js/modules/map-layer.js?v=20260325-1"></script>
   <script src="assets/js/modules/footprint-layer.js?v=20260325-1"></script>
-  <script src="assets/js/modules/render-layer.js?v=20260326-1"></script>
-  <script src="assets/js/modules/auth-layer.js?v=20260325-1"></script>
-  <script src="assets/js/app.js?v=20260326-1"></script>
+  <script src="assets/js/modules/render-layer.js?v=20260327-23"></script>
+  <script src="assets/js/modules/auth-layer.js?v=20260327-6"></script>
+  <script src="assets/js/app.js?v=20260327-23"></script>
 </body>
 </html>
 
